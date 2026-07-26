@@ -121,8 +121,8 @@ Races only spawn Speed and Shield, since cubes never take damage there.
 | Rerun | Replay the current seed exactly |
 | New match | Same rules, new seed |
 
-Sound effects are synthesized in the browser (gunshots, wall thuds, cube impacts) and
-start after your first click or key press.
+Sound effects are synthesized in the browser (gunshots, wall thuds, cube impacts, heal
+and shield pickups) and start after your first click or key press.
 
 ## Seeds and determinism
 

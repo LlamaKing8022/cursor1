@@ -43,6 +43,9 @@ export class SoundEngine {
         case "cube_hit":
           this.playCubeHit(event.intensity, event.x);
           break;
+        case "powerup":
+          this.playPowerUp(event.kind, event.x);
+          break;
       }
     }
   }
@@ -123,6 +126,30 @@ export class SoundEngine {
     this.tone(dest, t, base, base * 0.55, duration, gain * 0.7, "square");
     this.tone(dest, t, base * 1.12, base * 0.7, duration * 0.85, gain * 0.45, "sine");
     this.noiseBurst(dest, t, duration * 0.6, gain * 0.35, 1800 + intensity * 800, duration);
+  }
+
+  private playPowerUp(kind: "heal" | "shield", x: number): void {
+    if (!this.ctx) return;
+
+    const dest = this.pan(x);
+    if (!dest) return;
+
+    const t = this.ctx.currentTime;
+
+    if (kind === "heal") {
+      // Bright ascending chime — restorative pickup.
+      this.tone(dest, t, 520, 780, 0.11, 0.42, "sine");
+      this.tone(dest, t + 0.07, 780, 1040, 0.13, 0.38, "sine");
+      this.tone(dest, t + 0.14, 1040, 1320, 0.16, 0.32, "triangle");
+      this.noiseBurst(dest, t + 0.05, 0.06, 0.12, 4200, 0.1);
+      return;
+    }
+
+    // Shield: low energy hum with a metallic ring.
+    this.tone(dest, t, 140, 220, 0.08, 0.45, "sine");
+    this.tone(dest, t + 0.04, 320, 280, 0.22, 0.5, "triangle");
+    this.tone(dest, t + 0.06, 880, 620, 0.18, 0.28, "sine");
+    this.noiseBurst(dest, t + 0.02, 0.05, 0.2, 2600, 0.14);
   }
 
   private noiseBurst(

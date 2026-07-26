@@ -875,6 +875,7 @@ export class Simulation {
     switch (kind) {
       case "heal":
         cube.hp = Math.min(cube.maxHp, cube.hp + 30);
+        this.emit({ type: "powerup", kind: "heal", x: cube.x });
         break;
       case "rage":
         cube.rageTime = 8;
@@ -884,6 +885,7 @@ export class Simulation {
         break;
       case "shield":
         cube.shieldTime = 12;
+        this.emit({ type: "powerup", kind: "shield", x: cube.x });
         break;
     }
     this.spawnParticles(cube.x, cube.y, 12, cube.color);
