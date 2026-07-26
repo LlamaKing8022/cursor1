@@ -34,9 +34,34 @@ afterward to fill out the podium.
 | Cubes | 2 to 16 competitors |
 | Speed | Baseline cube velocity, 0.5x to 2.5x |
 | Starting HP | Battle only; higher means longer fights |
-| Arena | `open` (empty), `pillars` (a few obstacles), `maze` (tight and chaotic) — each has its own colour palette |
+| Arena | `open` (empty), `pillars` (a few obstacles), `maze` (tight and chaotic) — each has its own colour palette — or one of your own maps |
 | Power-ups | Toggle pickups on or off |
 | Seed | Leave blank for random, or enter a value to replay an exact match |
+
+## Map editor
+
+Click **Map editor** in the top bar to build your own arena. Saved maps appear in the Setup
+dropdown under "Your maps", and work in both Battle Royale and Race.
+
+| Tool | What it does |
+| --- | --- |
+| Wall | Drag to draw a solid block, or click for a default-sized one |
+| Spawn zone | Drag out a region where cubes start; cubes are dealt round-robin into the zones and spread on a grid inside each one |
+| Power-up | Click to drop a pad. Pick a fixed type or `Random`, which re-rolls each time the pad refills |
+| Erase | Click any item to delete it |
+
+Other controls: map width (800–3600), a colour palette, grid snapping, undo (or Cmd/Ctrl+Z),
+and **Test battle** / **Test race** to try the current draft without saving it first.
+
+Notes on how maps behave:
+
+- Map height is fixed at 640 so the camera and aspect handling stay predictable.
+- In Race mode the finish line sits near the right edge, marked in the editor, so wider maps
+  make longer tracks.
+- A map with no spawn zones falls back to the default spawn positions.
+- Hand-placed pads respawn about 11 seconds after being collected, so they matter all match.
+- Maps are stored in your browser's `localStorage`, so they stay on the machine you built
+  them on.
 
 ## Power-ups
 
@@ -92,9 +117,15 @@ plays hundreds of full matches across every mode, arena, and roster size and che
 - cubes never stall out
 - the same seed replays identically
 
+A second suite covers custom maps: that walls and bounds come from the map, cubes spawn
+spread across the drawn zones, power-up pads respawn on their cooldown, the race finish line
+follows the map width, and that corrupt or out-of-bounds map data is cleaned up into
+something still playable rather than crashing.
+
 There is also a browser suite that drives the built app with Playwright, checking that the
 canvas actually draws, the controls and setup modal work, matches reach a winner on screen,
-and no runtime errors appear. It needs a server running:
+the map editor can draw and save a map that then plays, and no runtime errors appear. It
+needs a server running:
 
 ```bash
 npm run build
@@ -106,8 +137,9 @@ npm run test:browser -- http://localhost:4173
 
 ```
 src/
-  sim/          # DOM-free simulation: physics, modes, arenas, RNG
+  sim/          # DOM-free simulation: physics, modes, arenas, custom maps, RNG
   render/       # canvas renderer (camera, trails, particles) and arena palettes
+  editor/       # map editor screen and localStorage persistence
   main.ts       # app wiring, HUD, setup modal
 tests/          # headless simulation and browser tests
 ```

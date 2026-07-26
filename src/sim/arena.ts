@@ -1,4 +1,5 @@
 import type { ArenaStyle, GameMode, Rect } from "./types";
+import type { CustomMap } from "./map";
 import type { Rng } from "./rng";
 
 export const BATTLE_WORLD = { width: 1000, height: 640 };
@@ -16,7 +17,14 @@ export function raceTrackLength(style: ArenaStyle): number {
   }
 }
 
-export function createBounds(mode: GameMode, style: ArenaStyle): Rect {
+export function createBounds(
+  mode: GameMode,
+  style: ArenaStyle,
+  customMap?: CustomMap | null,
+): Rect {
+  if (customMap) {
+    return { x: 0, y: 0, width: customMap.width, height: customMap.height };
+  }
   if (mode === "race") {
     return { x: 0, y: 0, width: raceTrackLength(style), height: RACE_WORLD.height };
   }
@@ -28,7 +36,11 @@ export function createObstacles(
   style: ArenaStyle,
   bounds: Rect,
   rng: Rng,
+  customMap?: CustomMap | null,
 ): Rect[] {
+  if (customMap) {
+    return customMap.walls.map((wall) => ({ ...wall }));
+  }
   if (style === "open") {
     return mode === "race" ? raceGates(bounds, rng, 0.55) : [];
   }

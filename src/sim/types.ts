@@ -1,3 +1,5 @@
+import type { CustomMap } from "./map";
+
 export type GameMode = "battle" | "race";
 
 export type MatchStatus = "running" | "finished";
@@ -50,6 +52,8 @@ export interface PowerUp {
   y: number;
   half: number;
   age: number;
+  /** Index into a custom map's power-up spots, or null for random spawns. */
+  spotIndex: number | null;
 }
 
 export interface Particle {
@@ -72,6 +76,8 @@ export interface SimConfig {
   arenaStyle: ArenaStyle;
   powerUpsEnabled: boolean;
   startingHp: number;
+  /** When set, replaces the generated arena with a hand-built map. */
+  customMap?: CustomMap | null;
 }
 
 export type ArenaStyle = "open" | "pillars" | "maze";

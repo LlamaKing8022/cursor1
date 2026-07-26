@@ -2,6 +2,9 @@ import "./style.css";
 import { FIXED_STEP, Simulation } from "./sim/simulation";
 import { Renderer } from "./render/renderer";
 import { randomSeed, seedFromString } from "./sim/rng";
+import { MapEditor } from "./editor/editor";
+import { findMap, loadMaps } from "./editor/storage";
+import type { CustomMap } from "./sim/map";
 import type { ArenaStyle, Cube, GameMode, SimConfig } from "./sim/types";
 
 const MAX_STEPS_PER_FRAME = 12;
@@ -25,6 +28,7 @@ const ui = {
   rerun: required<HTMLButtonElement>("btn-rerun"),
   newMatch: required<HTMLButtonElement>("btn-new"),
   setupButton: required<HTMLButtonElement>("btn-setup"),
+  editorButton: required<HTMLButtonElement>("btn-editor"),
   leaderboard: required<HTMLOListElement>("leaderboard"),
   banner: required<HTMLDivElement>("banner"),
   bannerText: required<HTMLSpanElement>("banner-text"),
@@ -57,6 +61,7 @@ let config: SimConfig = {
   arenaStyle: "pillars",
   powerUpsEnabled: true,
   startingHp: 100,
+  customMap: null,
 };
 
 let sim = new Simulation(config);
@@ -74,12 +79,17 @@ function startMatch(next: SimConfig): void {
   resultShown = false;
   running = true;
 
-  renderer.setArena(config.mode, config.arenaStyle);
+  renderer.setArena(config.mode, config.customMap?.palette ?? config.arenaStyle);
   ui.result.hidden = true;
   ui.banner.hidden = true;
-  ui.modeLabel.textContent = config.mode === "battle" ? "Battle Royale" : "Race to the finish";
+
+  const modeName = config.mode === "battle" ? "Battle Royale" : "Race to the finish";
+  ui.modeLabel.textContent = config.customMap
+    ? `${modeName} · ${config.customMap.name}`
+    : modeName;
   ui.secondaryLabel.textContent = config.mode === "battle" ? "Alive" : "Leader";
   ui.seed.textContent = String(config.seed);
+  ui.modeLabel.title = config.customMap ? `Custom map: ${config.customMap.name}` : "";
   ui.play.textContent = "Pause";
   renderer.resize();
 }
@@ -255,9 +265,42 @@ for (const button of document.querySelectorAll<HTMLButtonElement>(".btn-speed"))
 /* ---------- Setup modal ---------- */
 
 function openSetup(): void {
+  refreshArenaOptions();
   syncSetupForm();
   ui.setup.hidden = false;
   setRunning(false);
+}
+
+const BUILT_IN_ARENAS: Array<[ArenaStyle, string]> = [
+  ["pillars", "Pillars — a few obstacles"],
+  ["open", "Open — wide and empty"],
+  ["maze", "Maze — tight and chaotic"],
+];
+
+/** Rebuilds the arena dropdown so newly saved custom maps show up. */
+function refreshArenaOptions(): void {
+  const previous = ui.arena.value;
+  const generated = document.createElement("optgroup");
+  generated.label = "Generated";
+  for (const [value, label] of BUILT_IN_ARENAS) {
+    generated.append(new Option(label, value));
+  }
+
+  const nodes: Array<HTMLOptGroupElement> = [generated];
+  const maps = loadMaps();
+  if (maps.length > 0) {
+    const custom = document.createElement("optgroup");
+    custom.label = "Your maps";
+    for (const map of maps) {
+      custom.append(new Option(map.name, `custom:${map.id}`));
+    }
+    nodes.push(custom);
+  }
+
+  ui.arena.replaceChildren(...nodes);
+
+  const stillThere = Array.from(ui.arena.options).some((option) => option.value === previous);
+  ui.arena.value = stillThere ? previous : config.arenaStyle;
 }
 
 function closeSetup(): void {
@@ -273,7 +316,7 @@ function syncSetupForm(): void {
   ui.count.value = String(config.cubeCount);
   ui.speed.value = String(config.speed);
   ui.hp.value = String(config.startingHp);
-  ui.arena.value = config.arenaStyle;
+  ui.arena.value = config.customMap ? `custom:${config.customMap.id}` : config.arenaStyle;
   ui.powerUps.checked = config.powerUpsEnabled;
   ui.seedInput.value = "";
   refreshSetupOutputs();
@@ -306,15 +349,20 @@ ui.setupForm.addEventListener("submit", (event) => {
   const raw = ui.seedInput.value.trim();
   const seed = raw === "" ? randomSeed() : /^\d+$/.test(raw) ? Number(raw) >>> 0 : seedFromString(raw);
 
+  const arenaValue = ui.arena.value;
+  const customMap = arenaValue.startsWith("custom:") ? findMap(arenaValue.slice(7)) : null;
+
   closeSetup();
   startMatch({
     mode: selectedMode(),
     cubeCount: Number(ui.count.value),
     seed,
     speed: Number(ui.speed.value),
-    arenaStyle: ui.arena.value as ArenaStyle,
+    // A custom map supplies its own layout, so keep the last generated style.
+    arenaStyle: customMap ? config.arenaStyle : (arenaValue as ArenaStyle),
     powerUpsEnabled: ui.powerUps.checked,
     startingHp: Number(ui.hp.value),
+    customMap,
   });
 });
 
@@ -325,7 +373,25 @@ ui.setup.addEventListener("click", (event) => {
   }
 });
 
+/* ---------- Map editor ---------- */
+
+const editor = new MapEditor({
+  onTest: (map: CustomMap, mode: GameMode) => {
+    startMatch({ ...config, mode, customMap: map, seed: randomSeed() });
+    setRunning(true);
+  },
+  onMapsChanged: refreshArenaOptions,
+  onClose: () => setRunning(true),
+});
+
+ui.editorButton.addEventListener("click", () => {
+  setRunning(false);
+  editor.open();
+});
+
 window.addEventListener("keydown", (event) => {
+  if (editor.isOpen) return;
+
   if (event.key === "Escape" && !ui.setup.hidden) {
     closeSetup();
     setRunning(true);

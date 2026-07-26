@@ -554,6 +554,127 @@ select:focus {
   margin-top: 22px;
 }
 
+/* ---------- Map editor ---------- */
+
+.editor-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: min(1180px, 100%);
+  /* A fixed height keeps the canvas from shifting when panel contents change. */
+  height: min(92vh, 780px);
+  padding: 22px;
+  background: linear-gradient(180deg, rgba(22, 29, 55, 0.98), rgba(12, 17, 34, 0.98));
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.editor-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.editor-top h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.editor-top .modal-sub {
+  margin: 5px 0 0;
+  max-width: 62ch;
+}
+
+.editor-body {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+  gap: 18px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.editor-panel {
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.editor-panel .field {
+  margin-bottom: 13px;
+}
+
+.tool-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.btn.tool {
+  padding: 8px 6px;
+  font-size: 12px;
+}
+
+.btn.tool.is-active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: #d8e6ff;
+}
+
+.editor-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.editor-actions .btn {
+  padding: 8px 6px;
+  font-size: 12px;
+  min-width: 0;
+}
+
+.editor-status {
+  margin: 4px 0 0;
+  min-height: 17px;
+  font-size: 12px;
+  color: var(--good);
+}
+
+.editor-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-width: 0;
+}
+
+#editor-canvas {
+  display: block;
+  width: 100%;
+  height: min(52vh, 430px);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.editor-scroll {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.editor-scroll:disabled {
+  opacity: 0.3;
+}
+
+.editor-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
 /* ---------- Scrollbars & responsive ---------- */
 
 ::-webkit-scrollbar {
@@ -597,5 +718,21 @@ select:focus {
 
   .stats {
     margin-left: 0;
+  }
+
+  /* Stacked layout needs the shell itself to scroll instead of clipping. */
+  .editor-shell {
+    height: auto;
+    max-height: 92vh;
+    overflow-y: auto;
+  }
+
+  .editor-body {
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+
+  .editor-panel {
+    overflow: visible;
   }
 }

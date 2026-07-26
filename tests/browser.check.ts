@@ -144,6 +144,132 @@ await page.keyboard.press("Space");
 check((await page.locator("#btn-play").textContent()) === "Play", "space toggles pause");
 await page.keyboard.press("Space");
 
+console.log("\nmap editor opens");
+await page.click("#btn-editor");
+check(await page.locator("#editor").isVisible(), "editor overlay opened");
+check(await page.locator("#editor-canvas").isVisible(), "editor canvas visible");
+
+// The canvas must not move when switching tools, or clicks land in the wrong
+// place: pads were being placed with one layout and erased with another.
+const toolBoxes: number[] = [];
+for (const tool of ["wall", "spawn", "powerup", "erase"]) {
+  await page.click(`.tool[data-tool="${tool}"]`);
+  const bounds = await page.locator("#editor-canvas").boundingBox();
+  toolBoxes.push(Math.round(bounds?.y ?? -1));
+}
+check(
+  new Set(toolBoxes).size === 1,
+  `canvas stays put across tools (y positions: ${toolBoxes.join(", ")})`,
+);
+
+const box = (await page.locator("#editor-canvas").boundingBox())!;
+async function dragOn(x1: number, y1: number, x2: number, y2: number) {
+  await page.mouse.move(box.x + x1, box.y + y1);
+  await page.mouse.down();
+  await page.mouse.move(box.x + x2, box.y + y2, { steps: 8 });
+  await page.mouse.up();
+}
+async function clickOn(x: number, y: number) {
+  await page.mouse.click(box.x + x, box.y + y);
+}
+
+await page.fill("#editor-name", "Test map");
+
+console.log("\ndrawing walls, spawn zones and pads");
+await page.click('.tool[data-tool="wall"]');
+await dragOn(120, 80, 200, 260);
+check(
+  ((await page.locator("#editor-hint").textContent()) ?? "").includes("1 walls"),
+  "wall was added",
+);
+
+await page.click('.tool[data-tool="spawn"]');
+await dragOn(320, 90, 460, 230);
+check(
+  ((await page.locator("#editor-hint").textContent()) ?? "").includes("1 spawn zones"),
+  "spawn zone was added",
+);
+
+await page.click('.tool[data-tool="powerup"]');
+check(
+  (await page.locator("#editor-kind").isDisabled()) === false,
+  "pad type selector enabled for the power-up tool",
+);
+await page.selectOption("#editor-kind", "heal");
+await clickOn(540, 300);
+check(((await page.locator("#editor-hint").textContent()) ?? "").includes("1 pads"), "pad was added");
+
+console.log("\nundo and erase");
+await page.click("#editor-undo");
+check(((await page.locator("#editor-hint").textContent()) ?? "").includes("0 pads"), "undo removed the pad");
+
+await page.click('.tool[data-tool="powerup"]');
+await clickOn(540, 300);
+await page.click('.tool[data-tool="erase"]');
+await clickOn(540, 300);
+check(
+  ((await page.locator("#editor-hint").textContent()) ?? "").includes("0 pads"),
+  "erase removed the pad",
+);
+
+await page.click('.tool[data-tool="powerup"]');
+await clickOn(560, 320);
+
+console.log("\nsaving the map");
+await page.click("#editor-save");
+check(
+  ((await page.locator("#editor-status").textContent()) ?? "").includes("Saved"),
+  "save reported success",
+);
+check(
+  (await page.locator("#editor-load option").allTextContents()).includes("Test map"),
+  "saved map appears in the editor's map list",
+);
+
+console.log("\ntesting the map straight from the editor");
+await page.click("#editor-test-battle");
+await page.waitForTimeout(1500);
+check((await page.locator("#editor").isVisible()) === false, "editor closed when testing");
+check(
+  ((await page.locator("#mode-label").textContent()) ?? "").includes("Test map"),
+  `match runs on the custom map (${await page.locator("#mode-label").textContent()})`,
+);
+
+console.log("\ncustom map is selectable in setup after a reload");
+await page.reload({ waitUntil: "load" });
+await page.waitForTimeout(1200);
+await page.click("#btn-setup");
+const arenaOptions = await page.locator("#input-arena option").allTextContents();
+check(arenaOptions.includes("Test map"), `custom map listed in setup (${arenaOptions.join(", ")})`);
+
+await page.selectOption("#input-arena", { label: "Test map" });
+await page.click('#setup-form button[type="submit"]');
+await page.waitForTimeout(1500);
+check(
+  ((await page.locator("#mode-label").textContent()) ?? "").includes("Test map"),
+  "match started on the saved map",
+);
+check((await page.locator("#leaderboard .row").count()) > 0, "standings populated on the custom map");
+
+console.log("\ndeleting a saved map");
+await page.click("#btn-editor");
+await page.selectOption("#editor-load", { label: "Test map" });
+check(
+  ((await page.locator("#editor-status").textContent()) ?? "").includes("Loaded"),
+  "saved map loaded back into the editor",
+);
+await page.click("#editor-delete");
+check(
+  ((await page.locator("#editor-status").textContent()) ?? "").includes("deleted"),
+  "map deleted",
+);
+check(
+  !(await page.locator("#editor-load option").allTextContents()).includes("Test map"),
+  "deleted map left the list",
+);
+await page.click("#editor-done");
+check((await page.locator("#editor").isVisible()) === false, "editor closed");
+
 console.log("\nno runtime errors");
 check(pageErrors.length === 0, `uncaught page errors: ${JSON.stringify(pageErrors)}`);
 check(consoleErrors.length === 0, `console errors: ${JSON.stringify(consoleErrors)}`);

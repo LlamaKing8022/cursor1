@@ -45,6 +45,7 @@
           <button id="btn-rerun" class="btn" type="button">Rerun</button>
           <button id="btn-new" class="btn" type="button">New match</button>
           <button id="btn-setup" class="btn" type="button">Setup</button>
+          <button id="btn-editor" class="btn" type="button">Map editor</button>
         </div>
       </header>
 
@@ -144,6 +145,111 @@
           <button type="submit" class="btn btn-primary">Start match</button>
         </div>
       </form>
+    </div>
+
+    <div class="modal" id="editor" hidden>
+      <div class="editor-shell">
+        <header class="editor-top">
+          <div>
+            <h2>Map editor</h2>
+            <p class="modal-sub">
+              Draw walls, mark where cubes spawn, and place power-up pads. Saved maps show up in
+              Setup.
+            </p>
+          </div>
+          <button id="editor-done" class="btn" type="button">Close</button>
+        </header>
+
+        <div class="editor-body">
+          <aside class="editor-panel">
+            <div class="field">
+              <label for="editor-name">Map name</label>
+              <input id="editor-name" type="text" maxlength="40" placeholder="My arena" />
+            </div>
+
+            <fieldset class="field">
+              <legend>Tool</legend>
+              <div class="tool-grid">
+                <button type="button" class="btn tool" data-tool="wall">Wall</button>
+                <button type="button" class="btn tool" data-tool="spawn">Spawn zone</button>
+                <button type="button" class="btn tool" data-tool="powerup">Power-up</button>
+                <button type="button" class="btn tool" data-tool="erase">Erase</button>
+              </div>
+            </fieldset>
+
+            <div class="field">
+              <label for="editor-kind">Pad type</label>
+              <select id="editor-kind">
+                <option value="random" selected>Random</option>
+                <option value="heal">Heal</option>
+                <option value="rage">Rage</option>
+                <option value="speed">Speed</option>
+                <option value="shield">Shield</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="editor-width">Map width <output id="editor-width-out">1200</output></label>
+              <input id="editor-width" type="range" min="800" max="3600" step="100" value="1200" />
+            </div>
+
+            <div class="field">
+              <label for="editor-palette">Colours</label>
+              <select id="editor-palette">
+                <option value="pillars" selected>Violet</option>
+                <option value="open">Blue</option>
+                <option value="maze">Green</option>
+              </select>
+            </div>
+
+            <div class="field field-row">
+              <label class="checkbox">
+                <input type="checkbox" id="editor-snap" checked />
+                <span>Snap to grid</span>
+              </label>
+            </div>
+
+            <div class="editor-actions">
+              <button id="editor-undo" class="btn" type="button">Undo</button>
+              <button id="editor-clear" class="btn" type="button">Clear</button>
+            </div>
+
+            <div class="field">
+              <label for="editor-load">Saved maps</label>
+              <select id="editor-load">
+                <option value="">— new map —</option>
+              </select>
+            </div>
+
+            <div class="editor-actions">
+              <button id="editor-save" class="btn btn-primary" type="button">Save map</button>
+              <button id="editor-delete" class="btn" type="button">Delete</button>
+            </div>
+
+            <div class="editor-actions">
+              <button id="editor-test-battle" class="btn" type="button">Test battle</button>
+              <button id="editor-test-race" class="btn" type="button">Test race</button>
+            </div>
+
+            <p class="editor-status" id="editor-status" role="status"></p>
+          </aside>
+
+          <div class="editor-stage">
+            <canvas id="editor-canvas" aria-label="Map editor canvas"></canvas>
+            <input
+              id="editor-scroll"
+              class="editor-scroll"
+              type="range"
+              min="0"
+              max="0"
+              value="0"
+              step="10"
+              aria-label="Scroll map horizontally"
+            />
+            <p class="editor-hint" id="editor-hint"></p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script type="module" src="/src/main.ts"></script>

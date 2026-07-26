@@ -1,6 +1,7 @@
 import { Rng } from "./rng";
 import { createBounds, createObstacles } from "./arena";
 import { colorFor, nameFor } from "./roster";
+import { mapFinishX, type CustomMap, type SpotKind } from "./map";
 import type {
   Cube,
   MatchStatus,
@@ -38,6 +39,8 @@ const HARD_TIME_LIMIT = 180;
 
 const POWERUP_INTERVAL = 4.5;
 const MAX_POWERUPS = 5;
+/** Hand-placed pads reappear on a timer so they stay relevant all match. */
+const SPOT_RESPAWN = 11;
 
 export class Simulation {
   readonly config: SimConfig;
@@ -58,6 +61,9 @@ export class Simulation {
   activeBounds: Rect;
 
   private rng: Rng;
+  private readonly customMap: CustomMap | null;
+  /** Seconds until each custom power-up pad becomes available again. */
+  private readonly spotCooldowns: number[];
   private readonly stormDelay: number;
   private readonly stormChipDelay: number;
   private trailTimer = 0;
@@ -70,10 +76,23 @@ export class Simulation {
   constructor(config: SimConfig) {
     this.config = config;
     this.rng = new Rng(config.seed);
-    this.bounds = createBounds(config.mode, config.arenaStyle);
-    this.obstacles = createObstacles(config.mode, config.arenaStyle, this.bounds, this.rng);
+    this.customMap = config.customMap ?? null;
+    this.bounds = createBounds(config.mode, config.arenaStyle, this.customMap);
+    this.obstacles = createObstacles(
+      config.mode,
+      config.arenaStyle,
+      this.bounds,
+      this.rng,
+      this.customMap,
+    );
+    this.spotCooldowns = (this.customMap?.powerUpSpots ?? []).map(() => 0);
     this.activeBounds = { ...this.bounds };
-    this.finishX = config.mode === "race" ? this.bounds.width - RACE_FINISH_MARGIN : null;
+    this.finishX =
+      config.mode === "race"
+        ? this.customMap
+          ? mapFinishX(this.customMap)
+          : this.bounds.width - RACE_FINISH_MARGIN
+        : null;
     this.stormDelay = STORM_BASE_DELAY + config.cubeCount;
     this.stormChipDelay = this.stormDelay + STORM_CHIP_GRACE;
     this.spawnCubes();
@@ -191,6 +210,11 @@ export class Simulation {
   }
 
   private spawnPosition(index: number, count: number): { x: number; y: number } {
+    const zones = this.customMap?.spawnZones ?? [];
+    if (zones.length > 0) {
+      return this.spawnInZone(index, count, zones);
+    }
+
     if (this.config.mode === "race") {
       // Stacked in a start column so the race begins fairly.
       const columns = Math.ceil(count / 8);
@@ -211,6 +235,30 @@ export class Simulation {
     return {
       x: this.bounds.width / 2 + Math.cos(angle) * radiusX,
       y: this.bounds.height / 2 + Math.sin(angle) * radiusY,
+    };
+  }
+
+  /**
+   * Deals cubes round-robin into the map's spawn zones, then lays each zone's
+   * share out on a grid so they do not start stacked on top of each other.
+   */
+  private spawnInZone(index: number, count: number, zones: Rect[]): { x: number; y: number } {
+    const zoneIndex = index % zones.length;
+    const zone = zones[zoneIndex];
+    const slot = Math.floor(index / zones.length);
+    const slots = Math.floor((count - 1 - zoneIndex) / zones.length) + 1;
+
+    const columns = Math.ceil(Math.sqrt(slots));
+    const rows = Math.ceil(slots / columns);
+    const column = slot % columns;
+    const row = Math.floor(slot / columns);
+
+    const x = zone.x + ((column + 0.5) * zone.width) / columns;
+    const y = zone.y + ((row + 0.5) * zone.height) / rows;
+
+    return {
+      x: Math.min(Math.max(x, CUBE_HALF), this.bounds.width - CUBE_HALF),
+      y: Math.min(Math.max(y, CUBE_HALF), this.bounds.height - CUBE_HALF),
     };
   }
 
@@ -404,11 +452,15 @@ export class Simulation {
       powerUp.age += dt;
     }
 
-    this.powerUpTimer -= dt;
-    if (this.powerUpTimer <= 0 && this.powerUps.length < MAX_POWERUPS) {
-      this.powerUpTimer = POWERUP_INTERVAL;
-      const spawned = this.trySpawnPowerUp();
-      if (!spawned) this.powerUpTimer = 1;
+    if (this.hasCustomSpots()) {
+      this.updateCustomSpots(dt);
+    } else {
+      this.powerUpTimer -= dt;
+      if (this.powerUpTimer <= 0 && this.powerUps.length < MAX_POWERUPS) {
+        this.powerUpTimer = POWERUP_INTERVAL;
+        const spawned = this.trySpawnPowerUp();
+        if (!spawned) this.powerUpTimer = 1;
+      }
     }
 
     for (const cube of this.cubes) {
@@ -420,15 +472,57 @@ export class Simulation {
           Math.abs(cube.y - powerUp.y) < cube.half + powerUp.half
         ) {
           this.applyPowerUp(cube, powerUp.kind);
+          if (powerUp.spotIndex !== null) {
+            this.spotCooldowns[powerUp.spotIndex] = SPOT_RESPAWN;
+          }
           this.powerUps.splice(i, 1);
         }
       }
     }
   }
 
+  private hasCustomSpots(): boolean {
+    return (this.customMap?.powerUpSpots.length ?? 0) > 0;
+  }
+
+  /** Hand-placed pads: one pickup per spot, reappearing after a cooldown. */
+  private updateCustomSpots(dt: number): void {
+    const spots = this.customMap?.powerUpSpots ?? [];
+
+    for (let index = 0; index < spots.length; index += 1) {
+      if (this.powerUps.some((powerUp) => powerUp.spotIndex === index)) continue;
+
+      if (this.spotCooldowns[index] > 0) {
+        this.spotCooldowns[index] -= dt;
+        continue;
+      }
+
+      const spot = spots[index];
+      this.powerUps.push({
+        id: this.nextPowerUpId++,
+        kind: this.resolveSpotKind(spot.kind),
+        x: spot.x,
+        y: spot.y,
+        half: 13,
+        age: 0,
+        spotIndex: index,
+      });
+    }
+  }
+
+  private resolveSpotKind(kind: SpotKind): PowerUpKind {
+    if (kind !== "random") return kind;
+    return this.rng.pick(this.powerUpPool());
+  }
+
+  private powerUpPool(): PowerUpKind[] {
+    return this.config.mode === "race"
+      ? ["speed", "speed", "shield"]
+      : ["heal", "rage", "speed", "shield"];
+  }
+
   private trySpawnPowerUp(): boolean {
-    const kinds: PowerUpKind[] =
-      this.config.mode === "race" ? ["speed", "speed", "shield"] : ["heal", "rage", "speed", "shield"];
+    const kinds = this.powerUpPool();
     const half = 13;
 
     for (let attempt = 0; attempt < 24; attempt += 1) {
@@ -446,7 +540,15 @@ export class Simulation {
       );
       if (blocked) continue;
 
-      this.powerUps.push({ id: this.nextPowerUpId++, kind: this.rng.pick(kinds), x, y, half, age: 0 });
+      this.powerUps.push({
+        id: this.nextPowerUpId++,
+        kind: this.rng.pick(kinds),
+        x,
+        y,
+        half,
+        age: 0,
+        spotIndex: null,
+      });
       return true;
     }
     return false;
