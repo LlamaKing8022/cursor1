@@ -55,7 +55,7 @@ dropdown under "Your maps", and work in both Battle Royale and Race.
 | Gun | Click to drop a gun for cubes to fight over |
 | Erase | Click any item to delete it |
 
-Other controls: map width (800–3600), a colour palette, grid snapping, undo (or Cmd/Ctrl+Z),
+Other controls: map width (800–3600), map height (640–1200), a colour palette, grid snapping, undo (or Cmd/Ctrl+Z),
 and **Test battle** / **Test race** to try the current draft without saving it first. Options
 that do not apply to the current tool stay in place but grey out, so the canvas never shifts
 under your cursor.
@@ -95,8 +95,8 @@ Gun icons are from [game-icons.net](https://game-icons.net) (CC BY 3.0).
 
 Notes on how maps behave:
 
-- Map height defaults to 640 for custom maps in the editor, but generated arenas can be
-  640–1200 px tall from Setup.
+- Map height defaults to 640 in the editor but can be stretched up to 1200. Generated arenas
+  in Setup use the same 640–1200 range.
 - In Race mode the finish line sits near the right edge, marked in the editor, so wider maps
   make longer tracks.
 - Guns are lethal, so a map with several of them produces much shorter battles.

@@ -1,10 +1,12 @@
 import type { ArenaStyle, PowerUpKind, Rect } from "./types";
 import { isGunKind, type GunKind } from "./guns";
 
-/** Height is fixed so the renderer's camera and aspect handling stay simple. */
+/** Default map height; generated arenas use the same range. */
 export const MAP_HEIGHT = 640;
 export const MIN_MAP_WIDTH = 800;
 export const MAX_MAP_WIDTH = 3600;
+export const MIN_MAP_HEIGHT = 640;
+export const MAX_MAP_HEIGHT = 1200;
 
 export const MIN_WALL_SIZE = 14;
 export const MIN_ZONE_SIZE = 40;
@@ -93,7 +95,7 @@ function isFiniteNumber(value: unknown): value is number {
  * Trims a rectangle to the map and returns null if what is left is too small to
  * be useful. Used both while editing and when loading maps from storage.
  */
-function sanitizeRect(raw: unknown, width: number, minSize: number): Rect | null {
+function sanitizeRect(raw: unknown, width: number, mapHeight: number, minSize: number): Rect | null {
   if (typeof raw !== "object" || raw === null) return null;
   const candidate = raw as Partial<Rect>;
   if (
@@ -107,8 +109,8 @@ function sanitizeRect(raw: unknown, width: number, minSize: number): Rect | null
 
   const left = clamp(Math.min(candidate.x, candidate.x + candidate.width), 0, width);
   const right = clamp(Math.max(candidate.x, candidate.x + candidate.width), 0, width);
-  const top = clamp(Math.min(candidate.y, candidate.y + candidate.height), 0, MAP_HEIGHT);
-  const bottom = clamp(Math.max(candidate.y, candidate.y + candidate.height), 0, MAP_HEIGHT);
+  const top = clamp(Math.min(candidate.y, candidate.y + candidate.height), 0, mapHeight);
+  const bottom = clamp(Math.max(candidate.y, candidate.y + candidate.height), 0, mapHeight);
 
   const rect: Rect = { x: left, y: top, width: right - left, height: bottom - top };
   if (rect.width < minSize || rect.height < minSize) return null;
@@ -116,8 +118,8 @@ function sanitizeRect(raw: unknown, width: number, minSize: number): Rect | null
 }
 
 /** Maps saved before moving walls existed simply have no direction. */
-function sanitizeWall(raw: unknown, width: number): MapWall | null {
-  const rect = sanitizeRect(raw, width, MIN_WALL_SIZE);
+function sanitizeWall(raw: unknown, width: number, mapHeight: number): MapWall | null {
+  const rect = sanitizeRect(raw, width, mapHeight, MIN_WALL_SIZE);
   if (!rect) return null;
 
   const candidate = raw as Partial<MapWall>;
@@ -131,19 +133,19 @@ function sanitizeWall(raw: unknown, width: number): MapWall | null {
   return { ...rect, direction, speed };
 }
 
-function sanitizeGun(raw: unknown, width: number): GunSpot | null {
+function sanitizeGun(raw: unknown, width: number, mapHeight: number): GunSpot | null {
   if (typeof raw !== "object" || raw === null) return null;
   const candidate = raw as Partial<GunSpot>;
   if (!isFiniteNumber(candidate.x) || !isFiniteNumber(candidate.y)) return null;
 
   return {
     x: clamp(candidate.x, 16, width - 16),
-    y: clamp(candidate.y, 16, MAP_HEIGHT - 16),
+    y: clamp(candidate.y, 16, mapHeight - 16),
     kind: isGunKind(candidate.kind) ? candidate.kind : "pistol",
   };
 }
 
-function sanitizeSpot(raw: unknown, width: number): PowerUpSpot | null {
+function sanitizeSpot(raw: unknown, width: number, mapHeight: number): PowerUpSpot | null {
   if (typeof raw !== "object" || raw === null) return null;
   const candidate = raw as Partial<PowerUpSpot>;
   if (!isFiniteNumber(candidate.x) || !isFiniteNumber(candidate.y)) return null;
@@ -151,7 +153,7 @@ function sanitizeSpot(raw: unknown, width: number): PowerUpSpot | null {
   const kind = SPOT_KINDS.includes(candidate.kind as SpotKind) ? (candidate.kind as SpotKind) : "random";
   return {
     x: clamp(candidate.x, 16, width - 16),
-    y: clamp(candidate.y, 16, MAP_HEIGHT - 16),
+    y: clamp(candidate.y, 16, mapHeight - 16),
     kind,
   };
 }
@@ -164,27 +166,30 @@ export function normalizeMap(raw: unknown): CustomMap | null {
   const width = isFiniteNumber(candidate.width)
     ? clamp(Math.round(candidate.width), MIN_MAP_WIDTH, MAX_MAP_WIDTH)
     : 1200;
+  const height = isFiniteNumber(candidate.height)
+    ? clamp(Math.round(candidate.height), MIN_MAP_HEIGHT, MAX_MAP_HEIGHT)
+    : MAP_HEIGHT;
   const palette = PALETTES.includes(candidate.palette as ArenaStyle)
     ? (candidate.palette as ArenaStyle)
     : "pillars";
 
   const walls = Array.isArray(candidate.walls)
     ? candidate.walls
-        .map((wall) => sanitizeWall(wall, width))
+        .map((wall) => sanitizeWall(wall, width, height))
         .filter((wall): wall is MapWall => wall !== null)
     : [];
   const spawnZones = Array.isArray(candidate.spawnZones)
     ? candidate.spawnZones
-        .map((zone) => sanitizeRect(zone, width, MIN_ZONE_SIZE))
+        .map((zone) => sanitizeRect(zone, width, height, MIN_ZONE_SIZE))
         .filter((zone): zone is Rect => zone !== null)
     : [];
   const powerUpSpots = Array.isArray(candidate.powerUpSpots)
     ? candidate.powerUpSpots
-        .map((spot) => sanitizeSpot(spot, width))
+        .map((spot) => sanitizeSpot(spot, width, height))
         .filter((spot): spot is PowerUpSpot => spot !== null)
     : [];
   const guns = Array.isArray(candidate.guns)
-    ? candidate.guns.map((gun) => sanitizeGun(gun, width)).filter((gun): gun is GunSpot => gun !== null)
+    ? candidate.guns.map((gun) => sanitizeGun(gun, width, height)).filter((gun): gun is GunSpot => gun !== null)
     : [];
 
   const name =
@@ -196,7 +201,7 @@ export function normalizeMap(raw: unknown): CustomMap | null {
     id: typeof candidate.id === "string" && candidate.id.length > 0 ? candidate.id : createMapId(),
     name,
     width,
-    height: MAP_HEIGHT,
+    height,
     palette,
     walls,
     spawnZones,

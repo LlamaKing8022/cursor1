@@ -634,6 +634,17 @@ input:disabled {
   margin-bottom: 13px;
 }
 
+.editor-size-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 13px;
+}
+
+.editor-size-row .field {
+  margin-bottom: 0;
+}
+
 .tool-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

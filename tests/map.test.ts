@@ -2,6 +2,7 @@ import { FIXED_STEP, Simulation } from "../src/sim/simulation";
 import { DEFAULT_ARENA_HEIGHT } from "../src/sim/arena";
 import {
   MAP_HEIGHT,
+  MAX_MAP_HEIGHT,
   MAX_MAP_WIDTH,
   MIN_MAP_WIDTH,
   createEmptyMap,
@@ -233,6 +234,9 @@ group("map validation cleans up bad data", () => {
 
   const tiny = normalizeMap({ width: 10 });
   check(tiny?.width === MIN_MAP_WIDTH, `undersized width raised to ${MIN_MAP_WIDTH}`);
+
+  const tall = normalizeMap({ width: 1200, height: 2000, walls: [], spawnZones: [], powerUpSpots: [] });
+  check(tall?.height === MAX_MAP_HEIGHT, `oversized height clamped to ${MAX_MAP_HEIGHT}`);
 
   const trimmed = normalizeMap({
     width: 1000,

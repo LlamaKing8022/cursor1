@@ -68,6 +68,8 @@ export class MapEditor {
     gun: element<HTMLSelectElement>("editor-gun"),
     width: element<HTMLInputElement>("editor-width"),
     widthOut: element<HTMLOutputElement>("editor-width-out"),
+    height: element<HTMLInputElement>("editor-height"),
+    heightOut: element<HTMLOutputElement>("editor-height-out"),
     palette: element<HTMLSelectElement>("editor-palette"),
     snap: element<HTMLInputElement>("editor-snap"),
     undo: element<HTMLButtonElement>("editor-undo"),
@@ -127,6 +129,7 @@ export class MapEditor {
     });
 
     this.ui.width.addEventListener("input", () => this.setWidth(Number(this.ui.width.value)));
+    this.ui.height.addEventListener("input", () => this.setHeight(Number(this.ui.height.value)));
     this.ui.wallSpeed.addEventListener("input", () => {
       this.ui.wallSpeedOut.textContent = this.ui.wallSpeed.value;
     });
@@ -194,6 +197,8 @@ export class MapEditor {
     this.ui.name.value = this.draft.name;
     this.ui.width.value = String(this.draft.width);
     this.ui.widthOut.textContent = String(this.draft.width);
+    this.ui.height.value = String(this.draft.height);
+    this.ui.heightOut.textContent = String(this.draft.height);
     this.ui.palette.value = this.draft.palette;
     this.updateHint();
   }
@@ -232,6 +237,17 @@ export class MapEditor {
     // Re-normalizing trims anything the narrower map can no longer hold.
     const resized = normalizeMap({ ...this.draft, width });
     if (resized) this.draft = resized;
+    this.ui.widthOut.textContent = String(this.draft.width);
+    this.ui.heightOut.textContent = String(this.draft.height);
+    this.clampScroll();
+    this.render();
+  }
+
+  private setHeight(height: number): void {
+    this.pushUndo();
+    const resized = normalizeMap({ ...this.draft, height });
+    if (resized) this.draft = resized;
+    this.ui.heightOut.textContent = String(this.draft.height);
     this.ui.widthOut.textContent = String(this.draft.width);
     this.clampScroll();
     this.render();
