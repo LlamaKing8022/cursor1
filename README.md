@@ -121,6 +121,9 @@ Races only spawn Speed and Shield, since cubes never take damage there.
 | Rerun | Replay the current seed exactly |
 | New match | Same rules, new seed |
 
+Sound effects are synthesized in the browser (gunshots, wall thuds, cube impacts) and
+start after your first click or key press.
+
 ## Seeds and determinism
 
 Every match is driven by a seeded PRNG, and the simulation runs on a fixed 1/120s

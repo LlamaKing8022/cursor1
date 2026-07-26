@@ -5,6 +5,7 @@ import { randomSeed, seedFromString } from "./sim/rng";
 import { GUNS } from "./sim/guns";
 import type { GunKind } from "./sim/guns";
 import { createGunIconElement } from "./render/gunIcons";
+import { SoundEngine } from "./audio/sounds";
 import { MapEditor } from "./editor/editor";
 import { findMap, loadMaps } from "./editor/storage";
 import type { CustomMap } from "./sim/map";
@@ -20,6 +21,7 @@ function required<T extends HTMLElement>(id: string): T {
 
 const canvas = required<HTMLCanvasElement>("arena");
 const renderer = new Renderer(canvas);
+const sounds = new SoundEngine();
 
 const ui = {
   modeLabel: required<HTMLParagraphElement>("mode-label"),
@@ -83,6 +85,7 @@ function startMatch(next: SimConfig): void {
   running = true;
 
   renderer.setArena(config.mode, config.customMap?.palette ?? config.arenaStyle);
+  sounds.setArenaWidth(sim.bounds.width);
   ui.result.hidden = true;
   ui.banner.hidden = true;
 
@@ -106,15 +109,19 @@ function frame(now: number): void {
   if (running && sim.status === "running") {
     accumulator += elapsed * timeScale;
     let steps = 0;
+    const frameEvents = [];
     while (accumulator >= FIXED_STEP && steps < MAX_STEPS_PER_FRAME * timeScale) {
       sim.step(FIXED_STEP);
+      frameEvents.push(...sim.drainEvents());
       accumulator -= FIXED_STEP;
       steps += 1;
     }
+    sounds.handle(frameEvents);
     // Drop leftover time rather than letting it snowball on slow frames.
     if (accumulator > FIXED_STEP * 4) accumulator = 0;
   } else {
     sim.step(0);
+    sim.drainEvents();
   }
 
   const snapshot = sim.snapshot();
@@ -426,6 +433,13 @@ window.addEventListener("keydown", (event) => {
 });
 
 window.addEventListener("resize", () => renderer.resize());
+
+function unlockAudio(): void {
+  sounds.unlock();
+}
+
+window.addEventListener("pointerdown", unlockAudio, { once: true });
+window.addEventListener("keydown", unlockAudio, { once: true });
 
 setTimeScale(1);
 startMatch(config);

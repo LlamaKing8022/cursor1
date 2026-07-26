@@ -3,6 +3,7 @@ import { createBounds, createObstacles } from "./arena";
 import { colorFor, nameFor } from "./roster";
 import { mapFinishX, type CustomMap, type SpotKind } from "./map";
 import { GUNS, GUN_HALF } from "./guns";
+import type { SimEvent } from "./events";
 import type {
   Bullet,
   Cube,
@@ -78,6 +79,8 @@ export class Simulation {
   private finishedCount = 0;
   private raceEnding = false;
   private podiumTimer = 0;
+  private stepDt = 0;
+  private events: SimEvent[] = [];
 
   constructor(config: SimConfig) {
     this.config = config;
@@ -109,8 +112,21 @@ export class Simulation {
     return this.cubes.filter((cube) => cube.alive);
   }
 
+  /** Events raised during the last fixed step(s); drained by the audio layer. */
+  drainEvents(): SimEvent[] {
+    const batch = this.events;
+    this.events = [];
+    return batch;
+  }
+
+  private emit(event: SimEvent): void {
+    if (this.stepDt <= 0) return;
+    this.events.push(event);
+  }
+
   /** Advances the match. `dt` should be a small fixed step (see `FIXED_STEP`). */
   step(dt: number): void {
+    this.stepDt = dt;
     if (this.status === "finished") {
       this.updateParticles(dt);
       return;
@@ -316,11 +332,16 @@ export class Simulation {
   private collideWithBounds(cube: Cube): void {
     const b = this.activeBounds;
     const isRace = this.config.mode === "race";
+    const ref = BASE_SPEED * this.config.speed * 2;
 
     if (cube.x - cube.half < b.x) {
+      const speed = Math.abs(cube.vx);
+      if (speed > 45) this.emit({ type: "wall_hit", intensity: Math.min(speed / ref, 1.4), x: cube.x });
       cube.x = b.x + cube.half;
       cube.vx = Math.abs(cube.vx) * RESTITUTION;
     } else if (cube.x + cube.half > b.x + b.width) {
+      const speed = Math.abs(cube.vx);
+      if (speed > 45) this.emit({ type: "wall_hit", intensity: Math.min(speed / ref, 1.4), x: cube.x });
       cube.x = b.x + b.width - cube.half;
       // In race mode the right wall sits past the finish line, so this only
       // matters for the battle arena.
@@ -328,9 +349,13 @@ export class Simulation {
     }
 
     if (cube.y - cube.half < b.y) {
+      const speed = Math.abs(cube.vy);
+      if (speed > 45) this.emit({ type: "wall_hit", intensity: Math.min(speed / ref, 1.4), x: cube.x });
       cube.y = b.y + cube.half;
       cube.vy = Math.abs(cube.vy) * RESTITUTION;
     } else if (cube.y + cube.half > b.y + b.height) {
+      const speed = Math.abs(cube.vy);
+      if (speed > 45) this.emit({ type: "wall_hit", intensity: Math.min(speed / ref, 1.4), x: cube.x });
       cube.y = b.y + b.height - cube.half;
       cube.vy = -Math.abs(cube.vy) * RESTITUTION;
     }
@@ -363,6 +388,8 @@ export class Simulation {
   }
 
   private collideWithObstacles(cube: Cube): void {
+    const ref = BASE_SPEED * this.config.speed * 2;
+
     for (const rect of this.obstacles) {
       const overlapX = cube.half + rect.width / 2 - Math.abs(cube.x - (rect.x + rect.width / 2));
       const overlapY = cube.half + rect.height / 2 - Math.abs(cube.y - (rect.y + rect.height / 2));
@@ -371,6 +398,10 @@ export class Simulation {
       // Push out along the shallower axis and reflect that component.
       if (overlapX < overlapY) {
         const side = cube.x < rect.x + rect.width / 2 ? -1 : 1;
+        const speed = Math.abs(cube.vx);
+        if (speed > 45) {
+          this.emit({ type: "wall_hit", intensity: Math.min(speed / ref, 1.4), x: cube.x });
+        }
         const ahead = side < 0 ? rect.x - cube.half : rect.x + rect.width + cube.half;
         const behind = side < 0 ? rect.x + rect.width + cube.half : rect.x - cube.half;
 
@@ -382,6 +413,10 @@ export class Simulation {
         }
       } else {
         const side = cube.y < rect.y + rect.height / 2 ? -1 : 1;
+        const speed = Math.abs(cube.vy);
+        if (speed > 45) {
+          this.emit({ type: "wall_hit", intensity: Math.min(speed / ref, 1.4), x: cube.x });
+        }
         const ahead = side < 0 ? rect.y - cube.half : rect.y + rect.height + cube.half;
         const behind = side < 0 ? rect.y + rect.height + cube.half : rect.y - cube.half;
 
@@ -419,6 +454,14 @@ export class Simulation {
         if (overlapX <= 0 || overlapY <= 0) continue;
 
         const relativeSpeed = Math.hypot(a.vx - b.vx, a.vy - b.vy);
+        const ref = BASE_SPEED * this.config.speed * 2;
+        if (relativeSpeed > 50) {
+          this.emit({
+            type: "cube_hit",
+            intensity: Math.min(relativeSpeed / ref, 1.5),
+            x: (a.x + b.x) / 2,
+          });
+        }
 
         if (overlapX < overlapY) {
           const side = a.x < b.x ? -1 : 1;
@@ -683,6 +726,7 @@ export class Simulation {
 
     this.spawnParticles(holder.x + Math.cos(gun.aim) * 18, holder.y + Math.sin(gun.aim) * 18, 4, stats.color);
     this.shake = Math.min(1, this.shake + (gun.kind === "sniper" ? 0.3 : 0.08));
+    this.emit({ type: "shot", kind: gun.kind, x: holder.x });
 
     if (this.bullets.length > 400) {
       this.bullets.splice(0, this.bullets.length - 400);
