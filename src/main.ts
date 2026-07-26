@@ -172,7 +172,8 @@ function buildRow(cube: Cube, index: number): HTMLLIElement {
 
   if (config.mode === "battle") {
     const ratio = cube.hp / cube.maxHp;
-    meta.textContent = cube.alive ? `${Math.ceil(cube.hp)} hp · ${cube.kills}k` : `out · ${cube.kills}k`;
+    const kos = `${cube.kills} KO`;
+    meta.textContent = cube.alive ? `${Math.ceil(cube.hp)} hp · ${kos}` : `out · ${kos}`;
     fill.style.width = `${Math.max(0, ratio) * 100}%`;
     fill.style.background = ratio > 0.5 ? "var(--good)" : ratio > 0.25 ? "#ffd166" : "var(--danger)";
   } else {

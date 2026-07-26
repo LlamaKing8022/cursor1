@@ -18,6 +18,12 @@
   box-sizing: border-box;
 }
 
+/* Layout rules below set `display`, which would otherwise beat the browser's
+   default styling for the `hidden` attribute and leave overlays on screen. */
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   height: 100%;
@@ -631,8 +637,12 @@ select:focus {
     grid-template-columns: 1fr;
   }
 
+  /* Match the arena's rough aspect so the renderer's letterboxing does not
+     leave a tall band of empty space above and below the action. */
   .canvas-wrap {
-    height: 56vh;
+    height: auto;
+    aspect-ratio: 16 / 11;
+    max-height: 62vh;
   }
 
   .sidebar {

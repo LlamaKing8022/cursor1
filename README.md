@@ -69,11 +69,12 @@ current match is shown in the top bar.
 ## Scripts
 
 ```bash
-npm run dev        # dev server with hot reload
-npm run build      # typecheck and build to dist/
-npm run preview    # serve the production build
-npm run typecheck  # types only
-npm test           # headless simulation tests
+npm run dev           # dev server with hot reload
+npm run build         # typecheck and build to dist/
+npm run preview       # serve the production build
+npm run typecheck     # types only
+npm test              # headless simulation tests
+npm run test:browser  # UI checks against a running preview server
 ```
 
 ## Tests
@@ -89,6 +90,16 @@ plays hundreds of full matches across every mode, arena, and roster size and che
 - no cube escapes the arena or picks up a NaN position
 - cubes never stall out
 - the same seed replays identically
+
+There is also a browser suite that drives the built app with Playwright, checking that the
+canvas actually draws, the controls and setup modal work, matches reach a winner on screen,
+and no runtime errors appear. It needs a server running:
+
+```bash
+npm run build
+npm run preview -- --port 4173
+npm run test:browser -- http://localhost:4173
+```
 
 ## Project layout
 
