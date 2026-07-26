@@ -1,4 +1,5 @@
-import type { Cube, GameMode, Rect, SimSnapshot } from "../sim/types";
+import type { ArenaStyle, Cube, GameMode, Rect, SimSnapshot } from "../sim/types";
+import { themeFor, type ArenaTheme } from "./theme";
 
 interface Camera {
   scale: number;
@@ -24,6 +25,8 @@ export class Renderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private cameraX = 0;
+  private mode: GameMode = "battle";
+  private theme: ArenaTheme = themeFor("pillars");
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -43,11 +46,14 @@ export class Renderer {
     }
   }
 
-  resetCamera(): void {
+  /** Call when a new match starts, before the first `draw`. */
+  setArena(mode: GameMode, style: ArenaStyle): void {
+    this.mode = mode;
+    this.theme = themeFor(style);
     this.cameraX = 0;
   }
 
-  draw(snapshot: SimSnapshot, world: Rect, mode: GameMode, dt: number): void {
+  draw(snapshot: SimSnapshot, world: Rect, dt: number): void {
     const { ctx, canvas } = this;
     const viewWidth = canvas.width;
     const viewHeight = canvas.height;
@@ -56,7 +62,7 @@ export class Renderer {
     ctx.clearRect(0, 0, viewWidth, viewHeight);
     this.paintBackdrop(viewWidth, viewHeight);
 
-    const camera = this.computeCamera(snapshot, world, mode, viewWidth, viewHeight, dt);
+    const camera = this.computeCamera(snapshot, world, viewWidth, viewHeight, dt);
     const shake = snapshot.shake;
     const shakeX = shake > 0 ? (Math.random() - 0.5) * shake * 14 : 0;
     const shakeY = shake > 0 ? (Math.random() - 0.5) * shake * 14 : 0;
@@ -65,17 +71,19 @@ export class Renderer {
     ctx.translate(camera.offsetX + shakeX, camera.offsetY + shakeY);
     ctx.scale(camera.scale, camera.scale);
 
-    this.drawArena(world, snapshot.bounds, mode);
+    this.drawFloor(world, snapshot.bounds);
+    this.drawDecor(world);
     this.drawGrid(world);
     if (snapshot.finishX !== null) {
       this.drawFinishLine(snapshot.finishX, world);
     }
+    this.drawBorders(world, snapshot.bounds);
     this.drawObstacles(snapshot.obstacles);
     this.drawPowerUps(snapshot);
     this.drawTrails(snapshot.cubes);
     this.drawParticles(snapshot);
     for (const cube of snapshot.cubes) {
-      this.drawCube(cube, mode);
+      this.drawCube(cube);
     }
 
     ctx.restore();
@@ -83,8 +91,8 @@ export class Renderer {
 
   private paintBackdrop(width: number, height: number): void {
     const gradient = this.ctx.createLinearGradient(0, 0, 0, height);
-    gradient.addColorStop(0, "#0b0f1c");
-    gradient.addColorStop(1, "#05070f");
+    gradient.addColorStop(0, this.theme.backdropTop);
+    gradient.addColorStop(1, this.theme.backdropBottom);
     this.ctx.fillStyle = gradient;
     this.ctx.fillRect(0, 0, width, height);
   }
@@ -92,14 +100,13 @@ export class Renderer {
   private computeCamera(
     snapshot: SimSnapshot,
     world: Rect,
-    mode: GameMode,
     viewWidth: number,
     viewHeight: number,
     dt: number,
   ): Camera {
     const padding = 24;
 
-    if (mode === "battle") {
+    if (this.mode === "battle") {
       const scale = Math.min(
         (viewWidth - padding * 2) / world.width,
         (viewHeight - padding * 2) / world.height,
@@ -114,10 +121,7 @@ export class Renderer {
     // Race: fit the track height, then follow the leading cube horizontally.
     const scale = (viewHeight - padding * 2) / world.height;
     const visibleWidth = viewWidth / scale;
-    const leader = snapshot.cubes.reduce(
-      (best, cube) => (cube.x > best ? cube.x : best),
-      0,
-    );
+    const leader = snapshot.cubes.reduce((best, cube) => (cube.x > best ? cube.x : best), 0);
     const desired = Math.min(
       Math.max(leader - visibleWidth * 0.55, 0),
       Math.max(world.width - visibleWidth, 0),
@@ -133,32 +137,96 @@ export class Renderer {
     };
   }
 
-  private drawArena(world: Rect, active: Rect, mode: GameMode): void {
+  private drawFloor(world: Rect, active: Rect): void {
     const { ctx } = this;
 
-    ctx.fillStyle = "#111729";
+    const gradient = ctx.createLinearGradient(0, 0, world.width * 0.35, world.height);
+    gradient.addColorStop(0, this.theme.floorTop);
+    gradient.addColorStop(1, this.theme.floorBottom);
+    ctx.fillStyle = gradient;
     ctx.fillRect(world.x, world.y, world.width, world.height);
 
-    if (mode === "battle" && active.width < world.width) {
-      // Shade the ground the storm has already taken.
-      ctx.fillStyle = "rgba(255, 77, 109, 0.12)";
+    if (this.mode === "battle" && active.width < world.width) {
+      // Tint the ground the storm has already claimed.
+      ctx.fillStyle = "rgba(255, 77, 109, 0.16)";
       ctx.fillRect(world.x, world.y, world.width, world.height);
-      ctx.fillStyle = "#111729";
+      ctx.fillStyle = gradient;
       ctx.fillRect(active.x, active.y, active.width, active.height);
-      ctx.strokeStyle = "rgba(255, 77, 109, 0.85)";
-      ctx.lineWidth = 3;
-      ctx.strokeRect(active.x, active.y, active.width, active.height);
+    }
+  }
+
+  /** Purely cosmetic shapes that give each map some colour of its own. */
+  private drawDecor(world: Rect): void {
+    const { ctx } = this;
+    const accent = this.theme.accent;
+
+    if (this.mode === "battle") {
+      const cx = world.width / 2;
+      const cy = world.height / 2;
+
+      ctx.strokeStyle = accent;
+      for (const [radius, alpha] of [
+        [world.height * 0.42, 0.07],
+        [world.height * 0.28, 0.1],
+        [world.height * 0.14, 0.13],
+      ] as const) {
+        ctx.globalAlpha = alpha;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Corner wedges to break up the empty edges of the floor.
+      ctx.fillStyle = accent;
+      ctx.globalAlpha = 0.06;
+      const wedge = Math.min(world.width, world.height) * 0.22;
+      for (const [sx, sy] of [
+        [0, 0],
+        [1, 0],
+        [0, 1],
+        [1, 1],
+      ] as const) {
+        const px = sx === 0 ? world.x : world.x + world.width;
+        const py = sy === 0 ? world.y : world.y + world.height;
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(px + (sx === 0 ? wedge : -wedge), py);
+        ctx.lineTo(px, py + (sy === 0 ? wedge : -wedge));
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      return;
     }
 
-    ctx.strokeStyle = "rgba(120, 150, 255, 0.35)";
-    ctx.lineWidth = 3;
-    ctx.strokeRect(world.x, world.y, world.width, world.height);
+    // Race: banded lanes plus accent stripes so speed is easy to read.
+    const bandHeight = world.height / 6;
+    ctx.fillStyle = accent;
+    for (let i = 0; i < 6; i += 1) {
+      ctx.globalAlpha = i % 2 === 0 ? 0.045 : 0.015;
+      ctx.fillRect(world.x, world.y + i * bandHeight, world.width, bandHeight);
+    }
+
+    // Distance markers hug the top and bottom edges: a full-height stripe here
+    // would read as a wall and make it unclear what the cubes can pass through.
+    const tick = 20;
+    ctx.globalAlpha = 0.5;
+    for (let x = 400; x < world.width - 100; x += 400) {
+      ctx.fillRect(x, world.y, 7, tick);
+      ctx.fillRect(x, world.y + world.height - tick, 7, tick);
+    }
+
+    // Start pad.
+    ctx.globalAlpha = 0.12;
+    ctx.fillRect(world.x, world.y, 110, world.height);
+    ctx.globalAlpha = 1;
   }
 
   private drawGrid(world: Rect): void {
     const { ctx } = this;
     const spacing = 64;
-    ctx.strokeStyle = "rgba(120, 150, 255, 0.07)";
+    ctx.strokeStyle = this.theme.grid;
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let x = spacing; x < world.width; x += spacing) {
@@ -172,6 +240,20 @@ export class Renderer {
     ctx.stroke();
   }
 
+  private drawBorders(world: Rect, active: Rect): void {
+    const { ctx } = this;
+
+    if (this.mode === "battle" && active.width < world.width) {
+      ctx.strokeStyle = "rgba(255, 77, 109, 0.85)";
+      ctx.lineWidth = 3;
+      ctx.strokeRect(active.x, active.y, active.width, active.height);
+    }
+
+    ctx.strokeStyle = this.theme.border;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(world.x, world.y, world.width, world.height);
+  }
+
   private drawFinishLine(finishX: number, world: Rect): void {
     const { ctx } = this;
     const squareSize = 16;
@@ -179,13 +261,13 @@ export class Renderer {
     for (let y = 0; y < world.height; y += squareSize) {
       const row = Math.floor(y / squareSize);
       for (let i = 0; i < 2; i += 1) {
-        ctx.fillStyle = (row + i) % 2 === 0 ? "#f4f7ff" : "#1a2138";
+        ctx.fillStyle = (row + i) % 2 === 0 ? "#f4f7ff" : "#141d2c";
         ctx.fillRect(finishX + i * squareSize, y, squareSize, squareSize);
       }
     }
 
-    ctx.strokeStyle = "rgba(244, 247, 255, 0.5)";
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = this.theme.accent;
+    ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(finishX, 0);
     ctx.lineTo(finishX, world.height);
@@ -194,13 +276,15 @@ export class Renderer {
 
   private drawObstacles(obstacles: Rect[]): void {
     const { ctx } = this;
-    for (const rect of obstacles) {
-      ctx.fillStyle = "#1d2540";
+    const fills = this.theme.obstacleFills;
+
+    obstacles.forEach((rect, index) => {
+      ctx.fillStyle = fills[index % fills.length];
       ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
-      ctx.strokeStyle = "rgba(140, 165, 255, 0.28)";
+      ctx.strokeStyle = this.theme.obstacleStroke;
       ctx.lineWidth = 2;
       ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
-    }
+    });
   }
 
   private drawPowerUps(snapshot: SimSnapshot): void {
@@ -210,14 +294,8 @@ export class Renderer {
       const size = powerUp.half * 2 * pulse;
       const color = POWERUP_COLORS[powerUp.kind];
 
-      ctx.save();
-      ctx.translate(powerUp.x, powerUp.y);
-      ctx.shadowColor = color;
-      ctx.shadowBlur = 18;
       ctx.fillStyle = color;
-      ctx.globalAlpha = 0.9;
-      ctx.fillRect(-size / 2, -size / 2, size, size);
-      ctx.restore();
+      ctx.fillRect(powerUp.x - size / 2, powerUp.y - size / 2, size, size);
 
       ctx.fillStyle = "#08101f";
       ctx.font = "bold 15px ui-monospace, monospace";
@@ -237,7 +315,7 @@ export class Renderer {
         const from = cube.trail[i - 1];
         const to = cube.trail[i];
         const strength = i / cube.trail.length;
-        ctx.globalAlpha = strength * 0.32;
+        ctx.globalAlpha = strength * 0.28;
         ctx.lineWidth = cube.half * strength * 0.9;
         ctx.beginPath();
         ctx.moveTo(from.x, from.y);
@@ -251,58 +329,46 @@ export class Renderer {
   private drawParticles(snapshot: SimSnapshot): void {
     const { ctx } = this;
     for (const particle of snapshot.particles) {
-      const alpha = particle.life / particle.maxLife;
-      ctx.globalAlpha = Math.max(0, alpha);
+      ctx.globalAlpha = Math.max(0, particle.life / particle.maxLife);
       ctx.fillStyle = particle.color;
       ctx.fillRect(particle.x, particle.y, particle.size, particle.size);
     }
     ctx.globalAlpha = 1;
   }
 
-  private drawCube(cube: Cube, mode: GameMode): void {
+  private drawCube(cube: Cube): void {
     const { ctx } = this;
     const size = cube.half * 2;
+    const left = cube.x - cube.half;
+    const top = cube.y - cube.half;
 
     if (!cube.alive) {
-      ctx.save();
       ctx.globalAlpha = 0.16;
       ctx.fillStyle = cube.color;
-      ctx.fillRect(cube.x - cube.half, cube.y - cube.half, size, size);
-      ctx.restore();
+      ctx.fillRect(left, top, size, size);
+      ctx.globalAlpha = 1;
       return;
     }
 
-    ctx.save();
-    ctx.translate(cube.x, cube.y);
-
-    ctx.shadowColor = cube.color;
-    ctx.shadowBlur = cube.boostTime > 0 ? 26 : 14;
     ctx.fillStyle = cube.flash > 0 ? "#ffffff" : cube.color;
-    ctx.fillRect(-cube.half, -cube.half, size, size);
-    ctx.shadowBlur = 0;
-
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(-cube.half, -cube.half, size, size);
+    ctx.fillRect(left, top, size, size);
 
     if (cube.rageTime > 0) {
       ctx.strokeStyle = "#ff4d6d";
       ctx.lineWidth = 3;
-      ctx.strokeRect(-cube.half - 4, -cube.half - 4, size + 8, size + 8);
+      ctx.strokeRect(left - 4, top - 4, size + 8, size + 8);
     }
     if (cube.shieldTime > 0) {
       ctx.strokeStyle = "rgba(77, 171, 255, 0.9)";
       ctx.lineWidth = 2.5;
       ctx.beginPath();
-      ctx.arc(0, 0, cube.half + 9, 0, Math.PI * 2);
+      ctx.arc(cube.x, cube.y, cube.half + 9, 0, Math.PI * 2);
       ctx.stroke();
     }
-    ctx.restore();
 
-    if (mode === "battle") {
+    if (this.mode === "battle") {
       this.drawHealthBar(cube);
     }
-    this.drawLabel(cube);
   }
 
   private drawHealthBar(cube: Cube): void {
@@ -317,14 +383,5 @@ export class Renderer {
     ctx.fillRect(x - 1, y - 1, width + 2, height + 2);
     ctx.fillStyle = ratio > 0.5 ? "#4dffa3" : ratio > 0.25 ? "#ffd166" : "#ff4d6d";
     ctx.fillRect(x, y, width * ratio, height);
-  }
-
-  private drawLabel(cube: Cube): void {
-    const { ctx } = this;
-    ctx.font = "600 11px ui-sans-serif, system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    ctx.fillStyle = "rgba(232, 236, 255, 0.75)";
-    ctx.fillText(cube.name, cube.x, cube.y + cube.half + 6);
   }
 }

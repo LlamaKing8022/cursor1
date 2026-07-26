@@ -34,7 +34,7 @@ afterward to fill out the podium.
 | Cubes | 2 to 16 competitors |
 | Speed | Baseline cube velocity, 0.5x to 2.5x |
 | Starting HP | Battle only; higher means longer fights |
-| Arena | `open` (empty), `pillars` (a few obstacles), `maze` (tight and chaotic) |
+| Arena | `open` (empty), `pillars` (a few obstacles), `maze` (tight and chaotic) — each has its own colour palette |
 | Power-ups | Toggle pickups on or off |
 | Seed | Leave blank for random, or enter a value to replay an exact match |
 
@@ -107,10 +107,13 @@ npm run test:browser -- http://localhost:4173
 ```
 src/
   sim/          # DOM-free simulation: physics, modes, arenas, RNG
-  render/       # canvas renderer (camera, trails, particles)
+  render/       # canvas renderer (camera, trails, particles) and arena palettes
   main.ts       # app wiring, HUD, setup modal
-tests/          # headless simulation tests
+tests/          # headless simulation and browser tests
 ```
+
+Cubes are identified by colour rather than on-canvas labels; the standings panel maps each
+colour to a name.
 
 ## How the simulation works
 

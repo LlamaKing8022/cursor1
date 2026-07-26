@@ -74,7 +74,7 @@ function startMatch(next: SimConfig): void {
   resultShown = false;
   running = true;
 
-  renderer.resetCamera();
+  renderer.setArena(config.mode, config.arenaStyle);
   ui.result.hidden = true;
   ui.banner.hidden = true;
   ui.modeLabel.textContent = config.mode === "battle" ? "Battle Royale" : "Race to the finish";
@@ -105,7 +105,7 @@ function frame(now: number): void {
   }
 
   const snapshot = sim.snapshot();
-  renderer.draw(snapshot, sim.bounds, config.mode, elapsed);
+  renderer.draw(snapshot, sim.bounds, elapsed);
   updateHud(snapshot.time);
   updateLeaderboard();
   updateBanner();
