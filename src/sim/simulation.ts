@@ -4,7 +4,7 @@ import { colorFor, nameFor } from "./roster";
 import { mapFinishX, type CustomMap, type SpotKind } from "./map";
 import { GUNS, GUN_HALF } from "./guns";
 import type { SimEvent } from "./events";
-import { teamCountFor, teamForCube } from "./teams";
+import { teamCountFor, teamColor, teamForCube } from "./teams";
 import type {
   Bullet,
   Cube,
@@ -216,10 +216,12 @@ export class Simulation {
       const heading = this.rng.direction();
       const speed = BASE_SPEED * this.config.speed;
 
+      const team = this.config.teamMode ? teamForCube(i, this.teamCount) : 0;
+
       this.cubes.push({
         id: i,
         name: nameFor(i),
-        color: colorFor(i),
+        color: this.config.teamMode ? teamColor(team) : colorFor(i),
         x: spawn.x,
         y: spawn.y,
         vx: this.config.mode === "race" ? Math.abs(heading.x) * speed : heading.x * speed,
@@ -240,7 +242,7 @@ export class Simulation {
         distanceTravelled: 0,
         deathTime: 0,
         killedBy: null,
-        team: this.config.teamMode ? teamForCube(i, this.teamCount) : 0,
+        team,
       });
     }
   }

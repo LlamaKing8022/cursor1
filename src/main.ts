@@ -90,9 +90,7 @@ function startMatch(next: SimConfig): void {
   resultShown = false;
   running = true;
 
-  renderer.setArena(config.mode, config.customMap?.palette ?? config.arenaStyle, {
-    teamMode: config.teamMode,
-  });
+  renderer.setArena(config.mode, config.customMap?.palette ?? config.arenaStyle);
   sounds.setArenaWidth(sim.bounds.width);
   ui.result.hidden = true;
   ui.banner.hidden = true;
@@ -201,13 +199,10 @@ function buildRow(cube: Cube, index: number): HTMLLIElement {
   const swatch = document.createElement("span");
   swatch.className = "row-swatch";
   swatch.style.background = cube.color;
-  if (config.teamMode && config.mode === "battle") {
-    swatch.style.boxShadow = `inset 0 0 0 2px ${teamColor(cube.team)}`;
-  }
 
   const name = document.createElement("span");
   name.className = "row-name";
-  name.textContent = config.teamMode && config.mode === "battle" ? `${cube.name} · ${teamName(cube.team)}` : cube.name;
+  name.textContent = cube.name;
 
   const meta = document.createElement("span");
   meta.className = "row-meta";
