@@ -87,6 +87,7 @@ plays hundreds of full matches across every mode, arena, and roster size and che
 - a mutual knockout still names a winner, via a survival-time tiebreak
 - races are won by crossing the line rather than by hitting the timeout
 - battles are usually decided by combat, not by storm chip damage
+- kills are credited to the cube that landed the blow
 - no cube escapes the arena or picks up a NaN position
 - cubes never stall out
 - the same seed replays identically

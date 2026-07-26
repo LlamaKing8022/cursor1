@@ -30,8 +30,6 @@ export interface Cube {
   rageTime: number;
   /** Countdown that drives the white hit-flash in the renderer. */
   flash: number;
-  rotation: number;
-  spin: number;
   trail: Array<{ x: number; y: number }>;
   /** Race mode: finishing position, 1-indexed. Zero until the cube finishes. */
   place: number;
@@ -39,6 +37,8 @@ export interface Cube {
   distanceTravelled: number;
   /** Battle mode: when the cube was eliminated. Zero while still alive. */
   deathTime: number;
+  /** Id of the cube that landed the killing blow, or null for the storm. */
+  killedBy: number | null;
 }
 
 export type PowerUpKind = "heal" | "rage" | "speed" | "shield";
@@ -60,22 +60,6 @@ export interface Particle {
   life: number;
   maxLife: number;
   size: number;
-  color: string;
-}
-
-export type MatchEventKind =
-  | "hit"
-  | "death"
-  | "pickup"
-  | "finish"
-  | "storm"
-  | "start"
-  | "win";
-
-export interface MatchEvent {
-  time: number;
-  kind: MatchEventKind;
-  text: string;
   color: string;
 }
 
@@ -103,6 +87,5 @@ export interface SimSnapshot {
   finishX: number | null;
   winner: Cube | null;
   standings: Cube[];
-  events: MatchEvent[];
   shake: number;
 }

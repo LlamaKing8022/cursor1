@@ -212,7 +212,6 @@ export class Renderer {
 
       ctx.save();
       ctx.translate(powerUp.x, powerUp.y);
-      ctx.rotate(powerUp.age * 1.2);
       ctx.shadowColor = color;
       ctx.shadowBlur = 18;
       ctx.fillStyle = color;
@@ -267,17 +266,14 @@ export class Renderer {
     if (!cube.alive) {
       ctx.save();
       ctx.globalAlpha = 0.16;
-      ctx.translate(cube.x, cube.y);
-      ctx.rotate(cube.rotation);
       ctx.fillStyle = cube.color;
-      ctx.fillRect(-cube.half, -cube.half, size, size);
+      ctx.fillRect(cube.x - cube.half, cube.y - cube.half, size, size);
       ctx.restore();
       return;
     }
 
     ctx.save();
     ctx.translate(cube.x, cube.y);
-    ctx.rotate(cube.rotation);
 
     ctx.shadowColor = cube.color;
     ctx.shadowBlur = cube.boostTime > 0 ? 26 : 14;

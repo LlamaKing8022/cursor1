@@ -26,7 +26,6 @@ const ui = {
   newMatch: required<HTMLButtonElement>("btn-new"),
   setupButton: required<HTMLButtonElement>("btn-setup"),
   leaderboard: required<HTMLOListElement>("leaderboard"),
-  feed: required<HTMLUListElement>("feed"),
   banner: required<HTMLDivElement>("banner"),
   bannerText: required<HTMLSpanElement>("banner-text"),
   result: required<HTMLDivElement>("result"),
@@ -65,7 +64,6 @@ let running = true;
 let timeScale = 1;
 let accumulator = 0;
 let lastFrame = performance.now();
-let renderedEventCount = 0;
 let resultShown = false;
 
 function startMatch(next: SimConfig): void {
@@ -73,12 +71,10 @@ function startMatch(next: SimConfig): void {
   sim = new Simulation(config);
   accumulator = 0;
   lastFrame = performance.now();
-  renderedEventCount = 0;
   resultShown = false;
   running = true;
 
   renderer.resetCamera();
-  ui.feed.replaceChildren();
   ui.result.hidden = true;
   ui.banner.hidden = true;
   ui.modeLabel.textContent = config.mode === "battle" ? "Battle Royale" : "Race to the finish";
@@ -112,7 +108,6 @@ function frame(now: number): void {
   renderer.draw(snapshot, sim.bounds, config.mode, elapsed);
   updateHud(snapshot.time);
   updateLeaderboard();
-  updateFeed();
   updateBanner();
 
   if (sim.status === "finished" && !resultShown) {
@@ -186,38 +181,6 @@ function buildRow(cube: Cube, index: number): HTMLLIElement {
   bar.append(fill);
   row.append(rank, swatch, name, meta, bar);
   return row;
-}
-
-function updateFeed(): void {
-  const events = sim.events;
-  if (events.length === renderedEventCount) return;
-
-  // The sim trims old events, so rebuild whenever the tail moves.
-  if (events.length < renderedEventCount) {
-    ui.feed.replaceChildren();
-    renderedEventCount = 0;
-  }
-
-  for (let i = renderedEventCount; i < events.length; i += 1) {
-    const event = events[i];
-    const item = document.createElement("li");
-    item.style.borderLeftColor = event.color;
-
-    const time = document.createElement("span");
-    time.className = "feed-time";
-    time.textContent = `${event.time.toFixed(1)}s`;
-
-    const text = document.createElement("span");
-    text.textContent = event.text;
-
-    item.append(time, text);
-    ui.feed.prepend(item);
-  }
-
-  renderedEventCount = events.length;
-  while (ui.feed.childElementCount > 40) {
-    ui.feed.lastElementChild?.remove();
-  }
 }
 
 function updateBanner(): void {

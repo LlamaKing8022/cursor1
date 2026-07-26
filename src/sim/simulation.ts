@@ -3,8 +3,6 @@ import { createBounds, createObstacles } from "./arena";
 import { colorFor, nameFor } from "./roster";
 import type {
   Cube,
-  MatchEvent,
-  MatchEventKind,
   MatchStatus,
   Particle,
   PowerUp,
@@ -19,7 +17,6 @@ const CUBE_HALF = 16;
 const RESTITUTION = 1;
 const TRAIL_LENGTH = 14;
 const TRAIL_INTERVAL = 0.05;
-const MAX_EVENTS = 60;
 
 /**
  * Battle: the arena closes in to push survivors together. Chip damage only
@@ -51,7 +48,6 @@ export class Simulation {
   cubes: Cube[] = [];
   powerUps: PowerUp[] = [];
   particles: Particle[] = [];
-  events: MatchEvent[] = [];
 
   status: MatchStatus = "running";
   time = 0;
@@ -81,13 +77,6 @@ export class Simulation {
     this.stormDelay = STORM_BASE_DELAY + config.cubeCount;
     this.stormChipDelay = this.stormDelay + STORM_CHIP_GRACE;
     this.spawnCubes();
-    this.pushEvent(
-      "start",
-      config.mode === "battle"
-        ? `${this.cubes.length} cubes enter the arena`
-        : `${this.cubes.length} cubes line up to race`,
-      "#e8ecff",
-    );
   }
 
   get aliveCubes(): Cube[] {
@@ -143,7 +132,6 @@ export class Simulation {
       finishX: this.finishX,
       winner: this.winner,
       standings: this.standings(),
-      events: this.events,
       shake: this.shake,
     };
   }
@@ -192,13 +180,12 @@ export class Simulation {
         shieldTime: 0,
         rageTime: 0,
         flash: 0,
-        rotation: this.rng.range(0, Math.PI * 2),
-        spin: this.rng.range(-1.6, 1.6),
         trail: [],
         place: 0,
         finishTime: 0,
         distanceTravelled: 0,
         deathTime: 0,
+        killedBy: null,
       });
     }
   }
@@ -238,7 +225,6 @@ export class Simulation {
     cube.x += cube.vx * dt;
     cube.y += cube.vy * dt;
     cube.distanceTravelled += Math.hypot(cube.x - previousX, cube.y - previousY);
-    cube.rotation += cube.spin * dt;
 
     this.regulateSpeed(cube, dt);
   }
@@ -369,7 +355,6 @@ export class Simulation {
     if (target.shieldTime > 0) {
       target.shieldTime = 0;
       target.flash = 0.18;
-      this.pushEvent("hit", `${target.name}'s shield absorbs the hit`, target.color);
       return;
     }
 
@@ -382,24 +367,15 @@ export class Simulation {
       target.hp = 0;
       target.alive = false;
       target.deathTime = this.time;
+      target.killedBy = source ? source.id : null;
       this.spawnParticles(target.x, target.y, 26, target.color);
       this.shake = Math.min(1, this.shake + 0.5);
-      if (source) {
-        source.kills += 1;
-        this.pushEvent("death", `${source.name} eliminated ${target.name}`, source.color);
-      } else {
-        this.pushEvent("death", `${target.name} was crushed by the storm`, target.color);
-      }
+      if (source) source.kills += 1;
     }
   }
 
   private updateStorm(dt: number): void {
     if (this.time < this.stormDelay) return;
-
-    const wasOpen = this.activeBounds.width === this.bounds.width;
-    if (wasOpen) {
-      this.pushEvent("storm", "The walls begin closing in", "#ff9db0");
-    }
 
     const shrink = STORM_SPEED * dt;
     const minWidth = 260;
@@ -478,23 +454,17 @@ export class Simulation {
 
   private applyPowerUp(cube: Cube, kind: PowerUpKind): void {
     switch (kind) {
-      case "heal": {
-        const healed = Math.min(30, cube.maxHp - cube.hp);
-        cube.hp += healed;
-        this.pushEvent("pickup", `${cube.name} heals ${Math.round(healed)} HP`, cube.color);
+      case "heal":
+        cube.hp = Math.min(cube.maxHp, cube.hp + 30);
         break;
-      }
       case "rage":
         cube.rageTime = 8;
-        this.pushEvent("pickup", `${cube.name} goes berserk`, cube.color);
         break;
       case "speed":
         cube.boostTime = 6;
-        this.pushEvent("pickup", `${cube.name} picks up speed`, cube.color);
         break;
       case "shield":
         cube.shieldTime = 12;
-        this.pushEvent("pickup", `${cube.name} raises a shield`, cube.color);
         break;
     }
     this.spawnParticles(cube.x, cube.y, 12, cube.color);
@@ -521,9 +491,6 @@ export class Simulation {
         this.raceEnding = true;
         this.podiumTimer = RACE_PODIUM_GRACE;
         this.shake = 1;
-        this.pushEvent("finish", `${cube.name} crosses the finish line first`, cube.color);
-      } else {
-        this.pushEvent("finish", `${cube.name} finishes #${cube.place}`, cube.color);
       }
     }
 
@@ -594,13 +561,6 @@ export class Simulation {
     }
   }
 
-  private pushEvent(kind: MatchEventKind, text: string, color: string): void {
-    this.events.push({ time: this.time, kind, text, color });
-    if (this.events.length > MAX_EVENTS) {
-      this.events.splice(0, this.events.length - MAX_EVENTS);
-    }
-  }
-
   private checkForEnd(): void {
     if (this.config.mode === "battle") {
       const alive = this.aliveCubes;
@@ -643,15 +603,7 @@ export class Simulation {
     if (this.status === "finished") return;
     this.status = "finished";
     if (this.winner) {
-      const mutual = !this.winner.alive;
-      this.pushEvent(
-        "win",
-        mutual ? `${this.winner.name} wins on a photo finish!` : `${this.winner.name} wins!`,
-        this.winner.color,
-      );
       this.spawnParticles(this.winner.x, this.winner.y, 40, this.winner.color);
-    } else {
-      this.pushEvent("win", "Everyone was eliminated", "#e8ecff");
     }
   }
 }

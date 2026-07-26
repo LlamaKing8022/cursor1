@@ -75,17 +75,6 @@ body {
   border-radius: 7px;
   background: linear-gradient(135deg, var(--accent), var(--danger));
   box-shadow: 0 0 20px rgba(91, 140, 255, 0.55);
-  animation: tilt 5s ease-in-out infinite;
-}
-
-@keyframes tilt {
-  0%,
-  100% {
-    transform: rotate(-8deg);
-  }
-  50% {
-    transform: rotate(14deg);
-  }
 }
 
 .brand h1 {
@@ -306,8 +295,8 @@ canvas {
 /* ---------- Sidebar ---------- */
 
 .sidebar {
-  display: grid;
-  grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
+  display: flex;
+  flex-direction: column;
   gap: 14px;
   min-height: 0;
 }
@@ -315,6 +304,7 @@ canvas {
 .panel {
   display: flex;
   flex-direction: column;
+  flex: 1;
   min-height: 0;
   padding: 14px;
   background: var(--panel);
@@ -402,50 +392,6 @@ canvas {
   height: 100%;
   border-radius: 999px;
   transition: width 0.12s linear;
-}
-
-.panel-feed {
-  min-height: 0;
-}
-
-.feed {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  font-size: 12px;
-}
-
-.feed li {
-  display: flex;
-  gap: 8px;
-  padding: 5px 8px;
-  background: rgba(20, 27, 51, 0.6);
-  border-left: 2px solid var(--accent);
-  border-radius: 0 7px 7px 0;
-  animation: slide 0.25s ease;
-}
-
-@keyframes slide {
-  from {
-    opacity: 0;
-    transform: translateX(-6px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.feed-time {
-  font-family: var(--mono);
-  font-size: 10px;
-  color: var(--text-dim);
-  padding-top: 1px;
-  flex-shrink: 0;
 }
 
 /* ---------- Setup modal ---------- */
@@ -646,7 +592,7 @@ select:focus {
   }
 
   .sidebar {
-    grid-template-rows: 260px 200px;
+    min-height: 300px;
   }
 
   .stats {

@@ -58,7 +58,7 @@ const battleFrame = await canvasSignature(page);
 check(battleFrame.colors > 12, `canvas drew ${battleFrame.colors} distinct colours`);
 check(battleFrame.pixels > 40, `canvas has ${battleFrame.pixels} lit sample points`);
 check((await page.locator("#leaderboard .row").count()) === 8, "leaderboard lists 8 cubes");
-check((await page.locator("#feed li").count()) > 0, "match feed has entries");
+check((await page.locator("#feed").count()) === 0, "match feed is gone");
 check(/\d+\.\d+s/.test((await page.locator("#stat-time").textContent()) ?? ""), "clock is running");
 check((await page.locator("#result").isVisible()) === false, "result overlay hidden mid-match");
 await page.screenshot({ path: `${SHOT_DIR}/battle.png` });

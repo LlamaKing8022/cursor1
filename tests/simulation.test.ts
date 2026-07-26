@@ -133,8 +133,14 @@ group("battles are decided by fighting, not by the storm", () => {
 
   for (let seed = 1; seed <= total; seed += 1) {
     const { sim } = runMatch(baseConfig({ mode: "battle", seed, cubeCount: 8 }));
-    const finalDeath = sim.events.filter((event) => event.kind === "death").at(-1);
-    if (finalDeath?.text.includes("storm")) stormDecided += 1;
+    // The last cube to fall decides the match; a null killer means the storm did it.
+    const finalDeath = sim.cubes
+      .filter((cube) => !cube.alive)
+      .reduce<(typeof sim.cubes)[number] | null>(
+        (latest, cube) => (latest === null || cube.deathTime > latest.deathTime ? cube : latest),
+        null,
+      );
+    if (finalDeath && finalDeath.killedBy === null) stormDecided += 1;
     check(sim.time < 120, `seed ${seed}: match ran ${sim.time.toFixed(1)}s`);
   }
 
@@ -218,14 +224,47 @@ group("same seed replays identically", () => {
 
 group("power-ups spawn and get collected", () => {
   const sim = new Simulation(baseConfig({ mode: "battle", seed: 6161, powerUpsEnabled: true }));
-  for (let i = 0; i < 3600; i += 1) sim.step(FIXED_STEP);
+  let everSpawned = false;
+  let everCollected = false;
 
-  const pickups = sim.events.filter((event) => event.kind === "pickup");
-  check(pickups.length > 0 || sim.powerUps.length > 0, "power-ups appeared during the match");
+  for (let i = 0; i < 3600 && sim.status === "running"; i += 1) {
+    sim.step(FIXED_STEP);
+    if (sim.powerUps.length > 0) everSpawned = true;
+    // A buff can only be active because a cube walked into a pickup.
+    if (sim.cubes.some((cube) => cube.boostTime > 0 || cube.shieldTime > 0 || cube.rageTime > 0)) {
+      everCollected = true;
+    }
+  }
+
+  check(everSpawned, "power-ups appeared during the match");
+  check(everCollected, "a cube collected a power-up");
 
   const disabled = new Simulation(baseConfig({ mode: "battle", seed: 6161, powerUpsEnabled: false }));
-  for (let i = 0; i < 3600; i += 1) disabled.step(FIXED_STEP);
-  check(disabled.powerUps.length === 0, "no power-ups spawn when the option is off");
+  let buffSeen = false;
+  for (let i = 0; i < 3600 && disabled.status === "running"; i += 1) {
+    disabled.step(FIXED_STEP);
+    if (disabled.powerUps.length > 0) buffSeen = true;
+  }
+  check(!buffSeen, "no power-ups spawn when the option is off");
+});
+
+group("kills are attributed to the cube that landed the blow", () => {
+  const sim = new Simulation(baseConfig({ mode: "battle", seed: 909, cubeCount: 10 }));
+  while (sim.status === "running") sim.step(FIXED_STEP);
+
+  const dead = sim.cubes.filter((cube) => !cube.alive);
+  check(dead.length > 0, "some cubes were eliminated");
+
+  for (const cube of dead) {
+    check(cube.deathTime > 0, `${cube.name} recorded a death time`);
+    if (cube.killedBy !== null) {
+      check(cube.killedBy !== cube.id, `${cube.name} was not credited with killing itself`);
+    }
+  }
+
+  const totalKills = sim.cubes.reduce((sum, cube) => sum + cube.kills, 0);
+  const attributed = dead.filter((cube) => cube.killedBy !== null).length;
+  check(totalKills === attributed, `kill counts match attributed deaths (${totalKills} vs ${attributed})`);
 });
 
 group("standings are ordered sensibly", () => {
