@@ -26,6 +26,8 @@ function baseConfig(overrides: Partial<SimConfig> = {}): SimConfig {
     arenaStyle: "pillars",
     powerUpsEnabled: true,
     startingHp: 100,
+    teamMode: false,
+    collisionDamage: true,
     ...overrides,
   };
 }
@@ -287,6 +289,32 @@ group("standings are ordered sensibly", () => {
     unfinished.every((cube, i) => i === 0 || unfinished[i - 1].x >= cube.x),
     "race: unfinished cubes are sorted by progress",
   );
+});
+
+group("team mode finishes with one team left", () => {
+  for (const seed of [11, 22, 33, 44]) {
+    const { sim } = runMatch(baseConfig({ mode: "battle", seed, teamMode: true, cubeCount: 8 }));
+    check(sim.status === "finished", `seed ${seed}: finished`);
+    check(sim.winner !== null, `seed ${seed}: winner declared`);
+    const survivingTeams = new Set(sim.cubes.filter((cube) => cube.alive).map((cube) => cube.team));
+    check(survivingTeams.size <= 1, `seed ${seed}: at most one team survived`);
+  }
+});
+
+group("collision damage off keeps cubes healthy from bumps alone", () => {
+  const sim = new Simulation(
+    baseConfig({
+      mode: "battle",
+      seed: 555,
+      collisionDamage: false,
+      powerUpsEnabled: false,
+      cubeCount: 8,
+      arenaStyle: "open",
+    }),
+  );
+  for (let i = 0; i < 600; i += 1) sim.step(FIXED_STEP);
+  const allFull = sim.cubes.every((cube) => cube.hp === cube.maxHp && cube.alive);
+  check(allFull, "open arena with collision damage off: cubes kept full hp during early chaos");
 });
 
 console.log(`\n${checks - failures}/${checks} checks passed`);

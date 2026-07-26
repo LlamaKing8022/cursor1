@@ -556,6 +556,8 @@ input:disabled {
 .field-row {
   display: flex;
   align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
 }
 
 .checkbox {

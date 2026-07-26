@@ -4,6 +4,7 @@ import { colorFor, nameFor } from "./roster";
 import { mapFinishX, type CustomMap, type SpotKind } from "./map";
 import { GUNS, GUN_HALF } from "./guns";
 import type { SimEvent } from "./events";
+import { teamCountFor, teamForCube } from "./teams";
 import type {
   Bullet,
   Cube,
@@ -82,9 +83,12 @@ export class Simulation {
   private stepDt = 0;
   private events: SimEvent[] = [];
 
+  private readonly teamCount: number;
+
   constructor(config: SimConfig) {
     this.config = config;
     this.rng = new Rng(config.seed);
+    this.teamCount = config.teamMode ? teamCountFor(config.cubeCount) : 1;
     this.customMap = config.customMap ?? null;
     this.bounds = createBounds(config.mode, config.arenaStyle, this.customMap);
     this.obstacles = createObstacles(
@@ -236,6 +240,7 @@ export class Simulation {
         distanceTravelled: 0,
         deathTime: 0,
         killedBy: null,
+        team: this.config.teamMode ? teamForCube(i, this.teamCount) : 0,
       });
     }
   }
@@ -442,6 +447,22 @@ export class Simulation {
     return centre - half >= this.bounds.y - 0.5 && centre + half <= this.bounds.y + this.bounds.height + 0.5;
   }
 
+  private areAllies(a: Cube, b: Cube): boolean {
+    return this.config.teamMode && a.team === b.team;
+  }
+
+  private canDamage(attacker: Cube | null, target: Cube): boolean {
+    if (!attacker || attacker.id === target.id) return false;
+    if (this.areAllies(attacker, target)) return false;
+    return true;
+  }
+
+  private survivingTeams(): number[] {
+    const teams = new Set<number>();
+    for (const cube of this.aliveCubes) teams.add(cube.team);
+    return [...teams];
+  }
+
   private resolveCubeCollisions(): void {
     const active = this.cubes.filter((cube) => cube.alive && cube.place === 0);
 
@@ -480,7 +501,16 @@ export class Simulation {
         }
 
         if (this.config.mode === "battle") {
-          this.applyCombat(a, b, relativeSpeed);
+          if (this.config.collisionDamage && !this.areAllies(a, b)) {
+            this.applyCombat(a, b, relativeSpeed);
+          } else {
+            this.spawnParticles(
+              (a.x + b.x) / 2,
+              (a.y + b.y) / 2,
+              3,
+              this.rng.next() < 0.5 ? a.color : b.color,
+            );
+          }
         } else {
           this.spawnParticles(
             (a.x + b.x) / 2,
@@ -509,6 +539,7 @@ export class Simulation {
 
   private damage(target: Cube, amount: number, source: Cube | null): void {
     if (!target.alive || amount <= 0) return;
+    if (source && !this.canDamage(source, target)) return;
 
     if (target.shieldTime > 0) {
       target.shieldTime = 0;
@@ -695,6 +726,7 @@ export class Simulation {
 
     for (const cube of this.cubes) {
       if (cube.id === shooter.id || !cube.alive || cube.place > 0) continue;
+      if (this.areAllies(shooter, cube)) continue;
       const distance = Math.hypot(cube.x - shooter.x, cube.y - shooter.y);
       if (distance < bestDistance) {
         bestDistance = distance;
@@ -768,7 +800,8 @@ export class Simulation {
           cube.alive &&
           cube.place === 0 &&
           Math.abs(cube.x - bullet.x) < cube.half &&
-          Math.abs(cube.y - bullet.y) < cube.half,
+          Math.abs(cube.y - bullet.y) < cube.half &&
+          this.canDamage(this.cubes[bullet.owner] ?? null, cube),
       );
 
       if (hit) {
@@ -985,6 +1018,22 @@ export class Simulation {
   private checkForEnd(): void {
     if (this.config.mode === "battle") {
       const alive = this.aliveCubes;
+
+      if (this.config.teamMode) {
+        const teams = this.survivingTeams();
+        if (teams.length === 1 && alive.length > 0) {
+          this.winner = alive.reduce((best, cube) => (cube.hp > best.hp ? cube : best), alive[0]);
+          this.finish();
+        } else if (alive.length === 0) {
+          this.winner = this.lastCubeStanding();
+          this.finish();
+        } else if (this.time > HARD_TIME_LIMIT) {
+          this.winner = this.bestTeamRepresentative();
+          this.finish();
+        }
+        return;
+      }
+
       if (alive.length === 1) {
         this.winner = alive[0];
         this.finish();
@@ -1018,6 +1067,29 @@ export class Simulation {
       if (cube.kills !== best.kills) return cube.kills > best.kills ? cube : best;
       return cube.damageDealt > best.damageDealt ? cube : best;
     }, this.cubes[0]);
+  }
+
+  /** On a timeout in team mode, pick the team with the most total HP left. */
+  private bestTeamRepresentative(): Cube | null {
+    const alive = this.aliveCubes;
+    if (alive.length === 0) return this.lastCubeStanding();
+
+    const totals = new Map<number, number>();
+    for (const cube of alive) {
+      totals.set(cube.team, (totals.get(cube.team) ?? 0) + cube.hp);
+    }
+
+    let bestTeam = alive[0].team;
+    let bestTotal = totals.get(bestTeam) ?? 0;
+    for (const [team, total] of totals) {
+      if (total > bestTotal) {
+        bestTeam = team;
+        bestTotal = total;
+      }
+    }
+
+    const teamCubes = alive.filter((cube) => cube.team === bestTeam);
+    return teamCubes.reduce((best, cube) => (cube.hp > best.hp ? cube : best), teamCubes[0]);
   }
 
   private finish(): void {

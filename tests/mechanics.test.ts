@@ -28,6 +28,8 @@ function configFor(map: CustomMap, mode: GameMode, overrides: Partial<SimConfig>
     arenaStyle: "pillars",
     powerUpsEnabled: false,
     startingHp: 100,
+    teamMode: false,
+    collisionDamage: true,
     customMap: map,
     ...overrides,
   };

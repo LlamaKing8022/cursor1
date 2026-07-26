@@ -8,6 +8,7 @@ import type {
   SimSnapshot,
 } from "../sim/types";
 import { GUNS, GUN_HALF } from "../sim/guns";
+import { teamColor } from "../sim/teams";
 import { drawGunHeld, drawGunPickup } from "./gunIcons";
 import { themeFor, type ArenaTheme } from "./theme";
 
@@ -36,6 +37,7 @@ export class Renderer {
   private ctx: CanvasRenderingContext2D;
   private cameraX = 0;
   private mode: GameMode = "battle";
+  private teamMode = false;
   private theme: ArenaTheme = themeFor("pillars");
 
   constructor(canvas: HTMLCanvasElement) {
@@ -57,8 +59,9 @@ export class Renderer {
   }
 
   /** Call when a new match starts, before the first `draw`. */
-  setArena(mode: GameMode, style: ArenaStyle): void {
+  setArena(mode: GameMode, style: ArenaStyle, options: { teamMode?: boolean } = {}): void {
     this.mode = mode;
+    this.teamMode = options.teamMode ?? false;
     this.theme = themeFor(style);
     this.cameraX = 0;
   }
@@ -468,6 +471,13 @@ export class Renderer {
 
     ctx.fillStyle = cube.flash > 0 ? "#ffffff" : cube.color;
     ctx.fillRect(left, top, size, size);
+
+    if (this.teamMode) {
+      const stripe = 5;
+      ctx.fillStyle = teamColor(cube.team);
+      ctx.fillRect(left, top, stripe, size);
+      ctx.fillRect(left, top, size, stripe);
+    }
 
     if (cube.rageTime > 0) {
       ctx.strokeStyle = "#ff4d6d";

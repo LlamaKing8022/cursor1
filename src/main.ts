@@ -6,6 +6,7 @@ import { GUNS } from "./sim/guns";
 import type { GunKind } from "./sim/guns";
 import { createGunIconElement } from "./render/gunIcons";
 import { SoundEngine } from "./audio/sounds";
+import { teamColor, teamName } from "./sim/teams";
 import { MapEditor } from "./editor/editor";
 import { findMap, loadMaps } from "./editor/storage";
 import type { CustomMap } from "./sim/map";
@@ -55,6 +56,9 @@ const ui = {
   hpField: required<HTMLDivElement>("field-hp"),
   arena: required<HTMLSelectElement>("input-arena"),
   powerUps: required<HTMLInputElement>("input-powerups"),
+  teams: required<HTMLInputElement>("input-teams"),
+  collisionDamage: required<HTMLInputElement>("input-collision-damage"),
+  battleOptions: required<HTMLDivElement>("field-battle-options"),
   seedInput: required<HTMLInputElement>("input-seed"),
 };
 
@@ -66,6 +70,8 @@ let config: SimConfig = {
   arenaStyle: "pillars",
   powerUpsEnabled: true,
   startingHp: 100,
+  teamMode: false,
+  collisionDamage: true,
   customMap: null,
 };
 
@@ -84,16 +90,24 @@ function startMatch(next: SimConfig): void {
   resultShown = false;
   running = true;
 
-  renderer.setArena(config.mode, config.customMap?.palette ?? config.arenaStyle);
+  renderer.setArena(config.mode, config.customMap?.palette ?? config.arenaStyle, {
+    teamMode: config.teamMode,
+  });
   sounds.setArenaWidth(sim.bounds.width);
   ui.result.hidden = true;
   ui.banner.hidden = true;
 
-  const modeName = config.mode === "battle" ? "Battle Royale" : "Race to the finish";
+  const modeName =
+    config.mode === "battle"
+      ? config.teamMode
+        ? "Team Battle"
+        : "Battle Royale"
+      : "Race to the finish";
   ui.modeLabel.textContent = config.customMap
     ? `${modeName} · ${config.customMap.name}`
     : modeName;
-  ui.secondaryLabel.textContent = config.mode === "battle" ? "Alive" : "Leader";
+  ui.secondaryLabel.textContent =
+    config.mode === "battle" ? (config.teamMode ? "Teams" : "Alive") : "Leader";
   ui.seed.textContent = String(config.seed);
   ui.modeLabel.title = config.customMap ? `Custom map: ${config.customMap.name}` : "";
   ui.play.textContent = "Pause";
@@ -141,7 +155,12 @@ function updateHud(time: number): void {
   ui.time.textContent = `${time.toFixed(1)}s`;
 
   if (config.mode === "battle") {
-    ui.secondary.textContent = `${sim.aliveCubes.length}/${sim.cubes.length}`;
+    if (config.teamMode) {
+      const teams = new Set(sim.aliveCubes.map((cube) => cube.team));
+      ui.secondary.textContent = `${teams.size} teams`;
+    } else {
+      ui.secondary.textContent = `${sim.aliveCubes.length}/${sim.cubes.length}`;
+    }
     return;
   }
 
@@ -182,10 +201,13 @@ function buildRow(cube: Cube, index: number): HTMLLIElement {
   const swatch = document.createElement("span");
   swatch.className = "row-swatch";
   swatch.style.background = cube.color;
+  if (config.teamMode && config.mode === "battle") {
+    swatch.style.boxShadow = `inset 0 0 0 2px ${teamColor(cube.team)}`;
+  }
 
   const name = document.createElement("span");
   name.className = "row-name";
-  name.textContent = cube.name;
+  name.textContent = config.teamMode && config.mode === "battle" ? `${cube.name} · ${teamName(cube.team)}` : cube.name;
 
   const meta = document.createElement("span");
   meta.className = "row-meta";
@@ -244,16 +266,27 @@ function showResult(): void {
   ui.resultKicker.textContent = photoFinish
     ? "Photo finish"
     : config.mode === "battle"
-      ? "Last cube standing"
+      ? config.teamMode
+        ? "Last team standing"
+        : "Last cube standing"
       : "First across the line";
-  ui.resultName.textContent = winner.name;
-  ui.resultName.style.color = winner.color;
+  ui.resultName.textContent = config.teamMode ? `Team ${teamName(winner.team)}` : winner.name;
+  ui.resultName.style.color = config.teamMode ? teamColor(winner.team) : winner.color;
 
   if (config.mode === "battle") {
     const kills = winner.kills === 1 ? "1 elimination" : `${winner.kills} eliminations`;
-    ui.resultDetail.textContent = photoFinish
-      ? `Traded the final blow · ${kills} · lasted ${sim.time.toFixed(1)}s`
-      : `${kills} · ${Math.ceil(winner.hp)} HP left · survived ${sim.time.toFixed(1)}s`;
+    if (config.teamMode) {
+      const teammates = sim.cubes.filter((cube) => cube.team === winner.team && cube.alive);
+      const others =
+        teammates.length > 1 ? ` · ${teammates.length} cubes standing` : ` · led by ${winner.name}`;
+      ui.resultDetail.textContent = photoFinish
+        ? `Traded the final blow · ${kills} · lasted ${sim.time.toFixed(1)}s`
+        : `${kills}${others} · survived ${sim.time.toFixed(1)}s`;
+    } else {
+      ui.resultDetail.textContent = photoFinish
+        ? `Traded the final blow · ${kills} · lasted ${sim.time.toFixed(1)}s`
+        : `${kills} · ${Math.ceil(winner.hp)} HP left · survived ${sim.time.toFixed(1)}s`;
+    }
   } else {
     const runnerUp = sim.standings().find((cube) => cube.id !== winner.id && cube.place === 2);
     const margin = runnerUp ? ` · ${(runnerUp.finishTime - winner.finishTime).toFixed(2)}s ahead` : "";
@@ -343,6 +376,8 @@ function syncSetupForm(): void {
   ui.hp.value = String(config.startingHp);
   ui.arena.value = config.customMap ? `custom:${config.customMap.id}` : config.arenaStyle;
   ui.powerUps.checked = config.powerUpsEnabled;
+  ui.teams.checked = config.teamMode;
+  ui.collisionDamage.checked = config.collisionDamage;
   ui.seedInput.value = "";
   refreshSetupOutputs();
 }
@@ -356,8 +391,9 @@ function refreshSetupOutputs(): void {
   ui.countOut.textContent = ui.count.value;
   ui.speedOut.textContent = `${Number(ui.speed.value).toFixed(1)}x`;
   ui.hpOut.textContent = ui.hp.value;
-  // HP is meaningless in race mode since cubes never take damage.
-  ui.hpField.hidden = selectedMode() === "race";
+  const battle = selectedMode() === "battle";
+  ui.hpField.hidden = !battle;
+  ui.battleOptions.hidden = !battle;
 }
 
 ui.setupButton.addEventListener("click", openSetup);
@@ -387,6 +423,8 @@ ui.setupForm.addEventListener("submit", (event) => {
     arenaStyle: customMap ? config.arenaStyle : (arenaValue as ArenaStyle),
     powerUpsEnabled: ui.powerUps.checked,
     startingHp: Number(ui.hp.value),
+    teamMode: ui.teams.checked,
+    collisionDamage: ui.collisionDamage.checked,
     customMap,
   });
 });

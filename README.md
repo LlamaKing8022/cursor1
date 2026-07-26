@@ -30,10 +30,12 @@ afterward to fill out the podium.
 
 | Option | What it does |
 | --- | --- |
-| Mode | Battle Royale or Race |
+| Mode | Battle Royale, Team Battle, or Race |
 | Cubes | 2 to 16 competitors |
 | Speed | Baseline cube velocity, 0.5x to 2.5x |
 | Starting HP | Battle only; higher means longer fights |
+| Team mode | Battle only; cubes fight in coloured teams and the last team standing wins |
+| Collision damage | Battle only; toggle whether cube-cube impacts deal damage (guns still hurt) |
 | Arena | `open` (empty), `pillars` (a few obstacles), `maze` (tight and chaotic) — each has its own colour palette — or one of your own maps |
 | Power-ups | Toggle pickups on or off |
 | Seed | Leave blank for random, or enter a value to replay an exact match |

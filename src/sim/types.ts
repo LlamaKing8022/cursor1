@@ -76,6 +76,8 @@ export interface Cube {
   deathTime: number;
   /** Id of the cube that landed the killing blow, or null for the storm. */
   killedBy: number | null;
+  /** Battle team index. Zero when team mode is off. */
+  team: number;
 }
 
 export type PowerUpKind = "heal" | "rage" | "speed" | "shield";
@@ -111,6 +113,10 @@ export interface SimConfig {
   arenaStyle: ArenaStyle;
   powerUpsEnabled: boolean;
   startingHp: number;
+  /** Battle only: cubes are grouped into teams and the last team standing wins. */
+  teamMode: boolean;
+  /** Battle only: cube-cube impacts deal damage. Guns still hurt enemies. */
+  collisionDamage: boolean;
   /** When set, replaces the generated arena with a hand-built map. */
   customMap?: CustomMap | null;
 }
