@@ -56,9 +56,9 @@ function sampleMap(): CustomMap {
   const map = createEmptyMap("Test arena");
   map.width = 1400;
   map.walls = [
-    { x: 400, y: 0, width: 40, height: 240 },
-    { x: 400, y: 400, width: 40, height: 240 },
-    { x: 900, y: 260, width: 200, height: 40 },
+    { x: 400, y: 0, width: 40, height: 240, direction: "none", speed: 35 },
+    { x: 400, y: 400, width: 40, height: 240, direction: "none", speed: 35 },
+    { x: 900, y: 260, width: 200, height: 40, direction: "none", speed: 35 },
   ];
   map.spawnZones = [
     { x: 60, y: 60, width: 200, height: 200 },

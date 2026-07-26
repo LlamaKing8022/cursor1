@@ -2,9 +2,13 @@ import { Rng } from "./rng";
 import { createBounds, createObstacles } from "./arena";
 import { colorFor, nameFor } from "./roster";
 import { mapFinishX, type CustomMap, type SpotKind } from "./map";
+import { GUNS, GUN_HALF } from "./guns";
 import type {
+  Bullet,
   Cube,
+  GunInstance,
   MatchStatus,
+  Obstacle,
   Particle,
   PowerUp,
   PowerUpKind,
@@ -45,12 +49,14 @@ const SPOT_RESPAWN = 11;
 export class Simulation {
   readonly config: SimConfig;
   readonly bounds: Rect;
-  readonly obstacles: Rect[];
+  readonly obstacles: Obstacle[];
   readonly finishX: number | null;
 
   cubes: Cube[] = [];
   powerUps: PowerUp[] = [];
   particles: Particle[] = [];
+  guns: GunInstance[] = [];
+  bullets: Bullet[] = [];
 
   status: MatchStatus = "running";
   time = 0;
@@ -96,6 +102,7 @@ export class Simulation {
     this.stormDelay = STORM_BASE_DELAY + config.cubeCount;
     this.stormChipDelay = this.stormDelay + STORM_CHIP_GRACE;
     this.spawnCubes();
+    this.spawnGuns();
   }
 
   get aliveCubes(): Cube[] {
@@ -116,14 +123,20 @@ export class Simulation {
       this.updateStorm(dt);
     }
 
+    this.updateObstacles(dt);
+
     for (const cube of this.cubes) {
       if (!cube.alive || cube.place > 0) continue;
       this.integrate(cube, dt);
       this.collideWithBounds(cube);
       this.collideWithObstacles(cube);
+      // Moving walls can shove a cube past the edge, so clamp once more.
+      this.collideWithBounds(cube);
     }
 
     this.resolveCubeCollisions();
+    this.updateGuns(dt);
+    this.updateBullets(dt);
 
     if (this.config.powerUpsEnabled) {
       this.updatePowerUps(dt);
@@ -146,6 +159,8 @@ export class Simulation {
       cubes: this.cubes,
       powerUps: this.powerUps,
       particles: this.particles,
+      guns: this.guns,
+      bullets: this.bullets,
       bounds: this.activeBounds,
       obstacles: this.obstacles,
       finishX: this.finishX,
@@ -321,6 +336,32 @@ export class Simulation {
     }
   }
 
+  /** Patrolling walls travel until they reach a map edge, then turn around. */
+  private updateObstacles(dt: number): void {
+    for (const obstacle of this.obstacles) {
+      if (obstacle.vx === 0 && obstacle.vy === 0) continue;
+
+      obstacle.x += obstacle.vx * dt;
+      obstacle.y += obstacle.vy * dt;
+
+      if (obstacle.x < this.bounds.x) {
+        obstacle.x = this.bounds.x;
+        obstacle.vx = Math.abs(obstacle.vx);
+      } else if (obstacle.x + obstacle.width > this.bounds.x + this.bounds.width) {
+        obstacle.x = this.bounds.x + this.bounds.width - obstacle.width;
+        obstacle.vx = -Math.abs(obstacle.vx);
+      }
+
+      if (obstacle.y < this.bounds.y) {
+        obstacle.y = this.bounds.y;
+        obstacle.vy = Math.abs(obstacle.vy);
+      } else if (obstacle.y + obstacle.height > this.bounds.y + this.bounds.height) {
+        obstacle.y = this.bounds.y + this.bounds.height - obstacle.height;
+        obstacle.vy = -Math.abs(obstacle.vy);
+      }
+    }
+  }
+
   private collideWithObstacles(cube: Cube): void {
     for (const rect of this.obstacles) {
       const overlapX = cube.half + rect.width / 2 - Math.abs(cube.x - (rect.x + rect.width / 2));
@@ -330,14 +371,40 @@ export class Simulation {
       // Push out along the shallower axis and reflect that component.
       if (overlapX < overlapY) {
         const side = cube.x < rect.x + rect.width / 2 ? -1 : 1;
-        cube.x += side * overlapX;
+        const ahead = side < 0 ? rect.x - cube.half : rect.x + rect.width + cube.half;
+        const behind = side < 0 ? rect.x + rect.width + cube.half : rect.x - cube.half;
+
+        cube.x = this.fitsHorizontally(ahead, cube.half) || rect.vx === 0 ? ahead : behind;
         cube.vx = Math.abs(cube.vx) * side * RESTITUTION;
+        // A wall sweeping along this axis shoves the cube ahead of it.
+        if (rect.vx !== 0 && Math.sign(rect.vx) === side) {
+          cube.vx = side * Math.max(Math.abs(cube.vx), Math.abs(rect.vx));
+        }
       } else {
         const side = cube.y < rect.y + rect.height / 2 ? -1 : 1;
-        cube.y += side * overlapY;
+        const ahead = side < 0 ? rect.y - cube.half : rect.y + rect.height + cube.half;
+        const behind = side < 0 ? rect.y + rect.height + cube.half : rect.y - cube.half;
+
+        cube.y = this.fitsVertically(ahead, cube.half) || rect.vy === 0 ? ahead : behind;
         cube.vy = Math.abs(cube.vy) * side * RESTITUTION;
+        if (rect.vy !== 0 && Math.sign(rect.vy) === side) {
+          cube.vy = side * Math.max(Math.abs(cube.vy), Math.abs(rect.vy));
+        }
       }
     }
+  }
+
+  /**
+   * A moving wall can pin a cube against the arena edge with nowhere to go. In
+   * that case the cube is let out the back of the wall instead of being buried,
+   * which reads better than a cube slowly vanishing into a solid block.
+   */
+  private fitsHorizontally(centre: number, half: number): boolean {
+    return centre - half >= this.bounds.x - 0.5 && centre + half <= this.bounds.x + this.bounds.width + 0.5;
+  }
+
+  private fitsVertically(centre: number, half: number): boolean {
+    return centre - half >= this.bounds.y - 0.5 && centre + half <= this.bounds.y + this.bounds.height + 0.5;
   }
 
   private resolveCubeCollisions(): void {
@@ -479,6 +546,212 @@ export class Simulation {
         }
       }
     }
+  }
+
+  /* ---------- Guns ---------- */
+
+  private spawnGuns(): void {
+    const spots = this.customMap?.guns ?? [];
+    this.guns = spots.map((spot, index) => ({
+      id: index,
+      kind: spot.kind,
+      x: spot.x,
+      y: spot.y,
+      holder: null,
+      ammo: GUNS[spot.kind].magazine,
+      cooldown: 0,
+      reloadTimer: 0,
+      aim: 0,
+    }));
+  }
+
+  private updateGuns(dt: number): void {
+    for (const gun of this.guns) {
+      if (gun.holder === null) {
+        gun.reloadTimer = Math.max(0, gun.reloadTimer - dt);
+        continue;
+      }
+
+      const holder = this.cubes[gun.holder];
+      if (!holder || !holder.alive || holder.place > 0) {
+        this.dropGun(gun, holder ?? null, false);
+        continue;
+      }
+
+      gun.x = holder.x;
+      gun.y = holder.y;
+
+      const target = this.nearestTarget(holder);
+      if (target) {
+        gun.aim = Math.atan2(target.y - holder.y, target.x - holder.x);
+      }
+
+      gun.cooldown -= dt;
+      if (!target || gun.cooldown > 0 || gun.ammo <= 0) continue;
+
+      this.fire(gun, holder);
+      gun.ammo -= 1;
+      gun.cooldown = GUNS[gun.kind].fireInterval;
+
+      if (gun.ammo <= 0) {
+        this.dropGun(gun, holder, true);
+      }
+    }
+
+    this.collectGuns();
+  }
+
+  private collectGuns(): void {
+    for (const gun of this.guns) {
+      if (gun.holder !== null || gun.reloadTimer > 0) continue;
+
+      for (const cube of this.cubes) {
+        if (!cube.alive || cube.place > 0) continue;
+        if (this.gunHeldBy(cube.id)) continue;
+        if (
+          Math.abs(cube.x - gun.x) < cube.half + GUN_HALF &&
+          Math.abs(cube.y - gun.y) < cube.half + GUN_HALF
+        ) {
+          gun.holder = cube.id;
+          // Brief delay so a pickup does not fire on the same frame.
+          gun.cooldown = 0.3;
+          break;
+        }
+      }
+    }
+  }
+
+  /**
+   * `emptied` distinguishes the spec'd behaviour -- a gun shot dry is dropped
+   * and refills on the ground -- from a carrier dying, which leaves the
+   * remaining ammo for whoever grabs it next.
+   */
+  private dropGun(gun: GunInstance, holder: Cube | null, emptied: boolean): void {
+    if (holder) {
+      gun.x = Math.min(Math.max(holder.x, this.bounds.x + GUN_HALF), this.bounds.x + this.bounds.width - GUN_HALF);
+      gun.y = Math.min(Math.max(holder.y, this.bounds.y + GUN_HALF), this.bounds.y + this.bounds.height - GUN_HALF);
+    }
+    gun.holder = null;
+
+    if (emptied) {
+      gun.ammo = GUNS[gun.kind].magazine;
+      gun.reloadTimer = GUNS[gun.kind].reload;
+    } else {
+      gun.reloadTimer = 0.8;
+    }
+  }
+
+  gunHeldBy(cubeId: number): GunInstance | null {
+    return this.guns.find((gun) => gun.holder === cubeId) ?? null;
+  }
+
+  /** Closest cube that is still in play, ignoring the shooter itself. */
+  private nearestTarget(shooter: Cube): Cube | null {
+    let best: Cube | null = null;
+    let bestDistance = Infinity;
+
+    for (const cube of this.cubes) {
+      if (cube.id === shooter.id || !cube.alive || cube.place > 0) continue;
+      const distance = Math.hypot(cube.x - shooter.x, cube.y - shooter.y);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = cube;
+      }
+    }
+    return best;
+  }
+
+  private fire(gun: GunInstance, holder: Cube): void {
+    const stats = GUNS[gun.kind];
+
+    for (let pellet = 0; pellet < stats.pellets; pellet += 1) {
+      const angle = gun.aim + this.rng.range(-stats.spread, stats.spread);
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+
+      this.bullets.push({
+        x: holder.x + cos * (holder.half + 5),
+        y: holder.y + sin * (holder.half + 5),
+        vx: cos * stats.bulletSpeed,
+        vy: sin * stats.bulletSpeed,
+        life: stats.bulletLife,
+        damage: stats.damage,
+        owner: holder.id,
+        color: stats.color,
+      });
+    }
+
+    this.spawnParticles(holder.x + Math.cos(gun.aim) * 18, holder.y + Math.sin(gun.aim) * 18, 4, stats.color);
+    this.shake = Math.min(1, this.shake + (gun.kind === "sniper" ? 0.3 : 0.08));
+
+    if (this.bullets.length > 400) {
+      this.bullets.splice(0, this.bullets.length - 400);
+    }
+  }
+
+  private updateBullets(dt: number): void {
+    for (let i = this.bullets.length - 1; i >= 0; i -= 1) {
+      const bullet = this.bullets[i];
+      bullet.life -= dt;
+
+      if (bullet.life <= 0) {
+        this.bullets.splice(i, 1);
+        continue;
+      }
+
+      bullet.x += bullet.vx * dt;
+      bullet.y += bullet.vy * dt;
+
+      if (
+        bullet.x < this.bounds.x ||
+        bullet.y < this.bounds.y ||
+        bullet.x > this.bounds.x + this.bounds.width ||
+        bullet.y > this.bounds.y + this.bounds.height
+      ) {
+        this.bullets.splice(i, 1);
+        continue;
+      }
+
+      if (this.obstacles.some((rect) => this.pointInRect(bullet.x, bullet.y, rect))) {
+        this.spawnParticles(bullet.x, bullet.y, 2, bullet.color);
+        this.bullets.splice(i, 1);
+        continue;
+      }
+
+      const hit = this.cubes.find(
+        (cube) =>
+          cube.id !== bullet.owner &&
+          cube.alive &&
+          cube.place === 0 &&
+          Math.abs(cube.x - bullet.x) < cube.half &&
+          Math.abs(cube.y - bullet.y) < cube.half,
+      );
+
+      if (hit) {
+        this.hitWithBullet(hit, bullet);
+        this.bullets.splice(i, 1);
+      }
+    }
+  }
+
+  private hitWithBullet(target: Cube, bullet: Bullet): void {
+    this.spawnParticles(bullet.x, bullet.y, 5, bullet.color);
+
+    if (this.config.mode === "battle") {
+      const shooter = this.cubes[bullet.owner] ?? null;
+      this.damage(target, bullet.damage, shooter);
+      return;
+    }
+
+    // Racers take no damage, so bullets knock them off course instead.
+    const speed = Math.hypot(bullet.vx, bullet.vy) || 1;
+    target.vx += (bullet.vx / speed) * 90;
+    target.vy += (bullet.vy / speed) * 90;
+    target.flash = 0.1;
+  }
+
+  private pointInRect(x: number, y: number, rect: Rect): boolean {
+    return x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height;
   }
 
   private hasCustomSpots(): boolean {

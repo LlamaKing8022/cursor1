@@ -1,4 +1,13 @@
-import type { ArenaStyle, Cube, GameMode, Rect, SimSnapshot } from "../sim/types";
+import type {
+  ArenaStyle,
+  Cube,
+  GameMode,
+  GunInstance,
+  Obstacle,
+  Rect,
+  SimSnapshot,
+} from "../sim/types";
+import { GUNS, GUN_HALF } from "../sim/guns";
 import { themeFor, type ArenaTheme } from "./theme";
 
 interface Camera {
@@ -80,11 +89,14 @@ export class Renderer {
     this.drawBorders(world, snapshot.bounds);
     this.drawObstacles(snapshot.obstacles);
     this.drawPowerUps(snapshot);
+    this.drawGroundGuns(snapshot);
     this.drawTrails(snapshot.cubes);
     this.drawParticles(snapshot);
     for (const cube of snapshot.cubes) {
       this.drawCube(cube);
     }
+    this.drawHeldGuns(snapshot);
+    this.drawBullets(snapshot);
 
     ctx.restore();
   }
@@ -274,7 +286,7 @@ export class Renderer {
     ctx.stroke();
   }
 
-  private drawObstacles(obstacles: Rect[]): void {
+  private drawObstacles(obstacles: Obstacle[]): void {
     const { ctx } = this;
     const fills = this.theme.obstacleFills;
 
@@ -284,7 +296,35 @@ export class Renderer {
       ctx.strokeStyle = this.theme.obstacleStroke;
       ctx.lineWidth = 2;
       ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+
+      if (rect.vx !== 0 || rect.vy !== 0) {
+        this.drawMotionArrow(rect);
+      }
     });
+  }
+
+  /** Chevrons showing which way a patrolling wall is currently travelling. */
+  private drawMotionArrow(rect: Obstacle): void {
+    const { ctx } = this;
+    const cx = rect.x + rect.width / 2;
+    const cy = rect.y + rect.height / 2;
+    const angle = Math.atan2(rect.vy, rect.vx);
+    const size = Math.min(11, Math.max(rect.width, rect.height) / 4);
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angle);
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.75)";
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = "round";
+    for (const offset of [-size, size * 0.6]) {
+      ctx.beginPath();
+      ctx.moveTo(offset - size * 0.5, -size * 0.7);
+      ctx.lineTo(offset + size * 0.5, 0);
+      ctx.lineTo(offset - size * 0.5, size * 0.7);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   private drawPowerUps(snapshot: SimSnapshot): void {
@@ -302,6 +342,94 @@ export class Renderer {
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(POWERUP_GLYPHS[powerUp.kind], powerUp.x, powerUp.y + 1);
+    }
+  }
+
+  private drawGroundGuns(snapshot: SimSnapshot): void {
+    const { ctx } = this;
+
+    for (const gun of snapshot.guns) {
+      if (gun.holder !== null) continue;
+      const stats = GUNS[gun.kind];
+      const reloading = gun.reloadTimer > 0;
+
+      ctx.save();
+      ctx.globalAlpha = reloading ? 0.3 : 1;
+      ctx.fillStyle = stats.color;
+      ctx.fillRect(gun.x - GUN_HALF, gun.y - GUN_HALF * 0.55, GUN_HALF * 2, GUN_HALF * 1.1);
+      ctx.fillRect(gun.x - GUN_HALF * 0.35, gun.y - GUN_HALF * 0.1, GUN_HALF * 0.7, GUN_HALF);
+
+      ctx.fillStyle = "#08101f";
+      ctx.font = "bold 9px ui-monospace, monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(stats.tag, gun.x, gun.y - 1);
+      ctx.restore();
+
+      if (reloading) {
+        const progress = 1 - gun.reloadTimer / stats.reload;
+        ctx.strokeStyle = stats.color;
+        ctx.globalAlpha = 0.75;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(gun.x, gun.y, GUN_HALF + 6, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+
+  private drawHeldGuns(snapshot: SimSnapshot): void {
+    const { ctx } = this;
+    const byId = new Map(snapshot.cubes.map((cube) => [cube.id, cube]));
+
+    for (const gun of snapshot.guns) {
+      if (gun.holder === null) continue;
+      const holder = byId.get(gun.holder);
+      if (!holder || !holder.alive) continue;
+
+      const stats = GUNS[gun.kind];
+      ctx.save();
+      ctx.translate(holder.x, holder.y);
+      ctx.rotate(gun.aim);
+      ctx.fillStyle = stats.color;
+      ctx.fillRect(holder.half - 2, -3, 18, 6);
+      ctx.restore();
+
+      this.drawAmmoPips(gun, holder);
+    }
+  }
+
+  private drawAmmoPips(gun: GunInstance, holder: Cube): void {
+    const { ctx } = this;
+    const stats = GUNS[gun.kind];
+    const total = Math.min(stats.magazine, 10);
+    const shown = Math.ceil((gun.ammo / stats.magazine) * total);
+    const pipWidth = 3;
+    const gap = 1.6;
+    const fullWidth = total * (pipWidth + gap) - gap;
+    const startX = holder.x - fullWidth / 2;
+    const y = holder.y + holder.half + 5;
+
+    for (let i = 0; i < total; i += 1) {
+      ctx.fillStyle = i < shown ? stats.color : "rgba(255, 255, 255, 0.16)";
+      ctx.fillRect(startX + i * (pipWidth + gap), y, pipWidth, 3);
+    }
+  }
+
+  private drawBullets(snapshot: SimSnapshot): void {
+    const { ctx } = this;
+    ctx.lineCap = "round";
+
+    for (const bullet of snapshot.bullets) {
+      const speed = Math.hypot(bullet.vx, bullet.vy) || 1;
+      const length = Math.min(16, speed * 0.02);
+      ctx.strokeStyle = bullet.color;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(bullet.x, bullet.y);
+      ctx.lineTo(bullet.x - (bullet.vx / speed) * length, bullet.y - (bullet.vy / speed) * length);
+      ctx.stroke();
     }
   }
 

@@ -479,6 +479,19 @@ select:focus {
   border-color: var(--accent);
 }
 
+/* Tool options stay in place when they do not apply, so they need to read as
+   inactive rather than simply disappearing and reflowing the panel. */
+select:disabled,
+input:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.field:has(select:disabled) > label,
+.field:has(input:disabled) > label {
+  opacity: 0.5;
+}
+
 .mode-options {
   display: grid;
   gap: 8px;

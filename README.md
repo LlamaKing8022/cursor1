@@ -48,16 +48,51 @@ dropdown under "Your maps", and work in both Battle Royale and Race.
 | Wall | Drag to draw a solid block, or click for a default-sized one |
 | Spawn zone | Drag out a region where cubes start; cubes are dealt round-robin into the zones and spread on a grid inside each one |
 | Power-up | Click to drop a pad. Pick a fixed type or `Random`, which re-rolls each time the pad refills |
+| Gun | Click to drop a gun for cubes to fight over |
 | Erase | Click any item to delete it |
 
 Other controls: map width (800–3600), a colour palette, grid snapping, undo (or Cmd/Ctrl+Z),
-and **Test battle** / **Test race** to try the current draft without saving it first.
+and **Test battle** / **Test race** to try the current draft without saving it first. Options
+that do not apply to the current tool stay in place but grey out, so the canvas never shifts
+under your cursor.
+
+### Moving walls
+
+Give a wall a direction and it patrols that way at the speed you set (10–120 px/s), turning
+around when it reaches a map edge. The editor marks moving walls with an arrow and their
+speed; in a match they show chevrons pointing the way they are currently travelling.
+
+Cubes caught in front of a moving wall get shoved along ahead of it. If a wall pins a cube
+against the arena edge with nowhere left to go, the cube slips out the back of the wall
+rather than being buried inside it.
+
+### Guns
+
+Guns lie on the ground until a cube touches one. The carrier then automatically fires at
+whichever cube is nearest. When the magazine runs dry the carrier drops the gun, which
+reloads on the spot and can then be picked up by anyone — including a different cube. A cube
+can only carry one gun at a time, and a carrier that dies drops the gun with whatever ammo
+was left in it.
+
+| Gun | Damage | Rate | Magazine | Notes |
+| --- | --- | --- | --- | --- |
+| Pistol | 9 | steady | 9 | Reliable all-rounder |
+| SMG | 4 | very fast | 28 | Sprays, so shots wander |
+| Shotgun | 5 × 6 pellets | slow | 5 | Brutal up close, useless far away |
+| Sniper | 34 | very slow | 3 | Fast bullets, long reach |
+
+Bullets are blocked by walls, so cover works. In Race mode cubes have no health, so bullets
+shove them off course instead of damaging them.
+
+The carried gun shows as a barrel on the cube with ammo pips underneath, and its tag appears
+in the standings row.
 
 Notes on how maps behave:
 
 - Map height is fixed at 640 so the camera and aspect handling stay predictable.
 - In Race mode the finish line sits near the right edge, marked in the editor, so wider maps
   make longer tracks.
+- Guns are lethal, so a map with several of them produces much shorter battles.
 - A map with no spawn zones falls back to the default spawn positions.
 - Hand-placed pads respawn about 11 seconds after being collected, so they matter all match.
 - Maps are stored in your browser's `localStorage`, so they stay on the machine you built
@@ -121,6 +156,11 @@ A second suite covers custom maps: that walls and bounds come from the map, cube
 spread across the drawn zones, power-up pads respawn on their cooldown, the race finish line
 follows the map width, and that corrupt or out-of-bounds map data is cleaned up into
 something still playable rather than crashing.
+
+A third covers moving walls and guns: walls travel the right way and reverse at the edges
+without leaving the map or burying cubes, guns are picked up by one cube at a time, fire at
+the nearest target, never hit their owner, are stopped by walls, drop and reload when emptied
+and can then be picked up again, and maps saved before either feature existed still load.
 
 There is also a browser suite that drives the built app with Playwright, checking that the
 canvas actually draws, the controls and setup modal work, matches reach a winner on screen,

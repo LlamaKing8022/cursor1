@@ -8,13 +8,16 @@ import {
   normalizeMap,
   rectContains,
   type CustomMap,
+  type MapWall,
   type SpotKind,
+  type WallDirection,
 } from "../sim/map";
+import { GUNS, GUN_HALF, type GunKind } from "../sim/guns";
 import { themeFor } from "../render/theme";
 import { deleteMap, findMap, loadMaps, saveMap } from "./storage";
 import type { ArenaStyle, GameMode, Rect } from "../sim/types";
 
-type Tool = "wall" | "spawn" | "powerup" | "erase";
+type Tool = "wall" | "spawn" | "powerup" | "gun" | "erase";
 
 interface EditorOptions {
   onTest: (map: CustomMap, mode: GameMode) => void;
@@ -58,6 +61,10 @@ export class MapEditor {
   private ui = {
     name: element<HTMLInputElement>("editor-name"),
     kind: element<HTMLSelectElement>("editor-kind"),
+    direction: element<HTMLSelectElement>("editor-direction"),
+    wallSpeed: element<HTMLInputElement>("editor-wall-speed"),
+    wallSpeedOut: element<HTMLOutputElement>("editor-wall-speed-out"),
+    gun: element<HTMLSelectElement>("editor-gun"),
     width: element<HTMLInputElement>("editor-width"),
     widthOut: element<HTMLOutputElement>("editor-width-out"),
     palette: element<HTMLSelectElement>("editor-palette"),
@@ -119,6 +126,9 @@ export class MapEditor {
     });
 
     this.ui.width.addEventListener("input", () => this.setWidth(Number(this.ui.width.value)));
+    this.ui.wallSpeed.addEventListener("input", () => {
+      this.ui.wallSpeedOut.textContent = this.ui.wallSpeed.value;
+    });
     this.ui.palette.addEventListener("change", () => {
       this.draft.palette = this.ui.palette.value as ArenaStyle;
       this.render();
@@ -170,9 +180,12 @@ export class MapEditor {
     for (const button of document.querySelectorAll<HTMLButtonElement>(".tool")) {
       button.classList.toggle("is-active", button.dataset.tool === tool);
     }
-    // Disabled rather than hidden: removing the field would resize the panel
-    // and shift the canvas out from under the cursor.
+    // Disabled rather than hidden: removing fields would resize the panel and
+    // shift the canvas out from under the cursor.
     this.ui.kind.disabled = tool !== "powerup";
+    this.ui.gun.disabled = tool !== "gun";
+    this.ui.direction.disabled = tool !== "wall";
+    this.ui.wallSpeed.disabled = tool !== "wall";
     this.updateHint();
   }
 
@@ -345,6 +358,8 @@ export class MapEditor {
       this.eraseAt(point.x, point.y);
     } else if (this.tool === "powerup") {
       this.addSpot(point.x, point.y);
+    } else if (this.tool === "gun") {
+      this.addGun(point.x, point.y);
     } else if (isClick) {
       const size = this.tool === "wall" ? DEFAULT_WALL : DEFAULT_ZONE;
       this.addRect(this.centeredRect(point.x, point.y, size));
@@ -383,8 +398,10 @@ export class MapEditor {
 
     this.pushUndo();
     if (this.tool === "wall") {
-      this.draft.walls.push(clamped);
-      this.setStatus("Wall added");
+      const direction = this.ui.direction.value as WallDirection;
+      const wall: MapWall = { ...clamped, direction, speed: Number(this.ui.wallSpeed.value) };
+      this.draft.walls.push(wall);
+      this.setStatus(direction === "none" ? "Wall added" : `Moving wall added (${direction})`);
     } else {
       this.draft.spawnZones.push(clamped);
       this.setStatus("Spawn zone added");
@@ -416,8 +433,35 @@ export class MapEditor {
     this.updateHint();
   }
 
+  private addGun(x: number, y: number): void {
+    const px = Math.min(Math.max(this.snap(x), 16), this.draft.width - 16);
+    const py = Math.min(Math.max(this.snap(y), 16), this.draft.height - 16);
+
+    if (this.draft.walls.some((wall) => rectContains(wall, px, py))) {
+      this.setStatus("That spot is inside a wall");
+      return;
+    }
+
+    const kind = this.ui.gun.value as GunKind;
+    this.pushUndo();
+    this.draft.guns.push({ x: px, y: py, kind });
+    this.setStatus(`${GUNS[kind].name} added`);
+    this.updateHint();
+  }
+
   /** Removes the topmost item under the cursor, smallest kinds first. */
   private eraseAt(x: number, y: number): void {
+    for (let i = this.draft.guns.length - 1; i >= 0; i -= 1) {
+      const gun = this.draft.guns[i];
+      if (Math.abs(gun.x - x) <= GUN_HALF + 4 && Math.abs(gun.y - y) <= GUN_HALF + 4) {
+        this.pushUndo();
+        this.draft.guns.splice(i, 1);
+        this.setStatus("Gun removed");
+        this.updateHint();
+        return;
+      }
+    }
+
     for (let i = this.draft.powerUpSpots.length - 1; i >= 0; i -= 1) {
       const spot = this.draft.powerUpSpots[i];
       if (Math.abs(spot.x - x) <= 16 && Math.abs(spot.y - y) <= 16) {
@@ -463,13 +507,18 @@ export class MapEditor {
   }
 
   private updateHint(): void {
-    const counts = `${this.draft.walls.length} walls · ${this.draft.spawnZones.length} spawn zones · ${this.draft.powerUpSpots.length} pads`;
+    const moving = this.draft.walls.filter((wall) => wall.direction !== "none").length;
+    const wallLabel = moving > 0 ? `${this.draft.walls.length} walls (${moving} moving)` : `${this.draft.walls.length} walls`;
+    const counts = `${wallLabel} · ${this.draft.spawnZones.length} spawn zones · ${this.draft.powerUpSpots.length} pads · ${this.draft.guns.length} guns`;
+
     const action =
       this.tool === "erase"
         ? "Click an item to delete it."
         : this.tool === "powerup"
           ? "Click to drop a power-up pad."
-          : "Drag to draw, or click for a default size.";
+          : this.tool === "gun"
+            ? "Click to drop a gun."
+            : "Drag to draw, or click for a default size.";
     const fallback =
       this.draft.spawnZones.length === 0 ? " No spawn zones yet, so cubes use default positions." : "";
 
@@ -524,6 +573,7 @@ export class MapEditor {
     this.drawSpawnZones();
     this.drawWalls();
     this.drawSpots();
+    this.drawGuns();
     this.drawDragPreview();
 
     ctx.strokeStyle = theme.border;
@@ -613,10 +663,66 @@ export class MapEditor {
     this.draft.walls.forEach((wall, index) => {
       ctx.fillStyle = theme.obstacleFills[index % theme.obstacleFills.length];
       ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
-      ctx.strokeStyle = theme.obstacleStroke;
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = wall.direction === "none" ? theme.obstacleStroke : "rgba(255, 255, 255, 0.7)";
+      ctx.lineWidth = wall.direction === "none" ? 2 : 2.5;
       ctx.strokeRect(wall.x, wall.y, wall.width, wall.height);
+
+      if (wall.direction !== "none") {
+        this.drawWallArrow(wall);
+      }
     });
+  }
+
+  private drawWallArrow(wall: MapWall): void {
+    const { ctx } = this;
+    const angles: Record<WallDirection, number> = {
+      none: 0,
+      right: 0,
+      left: Math.PI,
+      up: -Math.PI / 2,
+      down: Math.PI / 2,
+    };
+    const cx = wall.x + wall.width / 2;
+    const cy = wall.y + wall.height / 2;
+    const size = Math.min(14, Math.max(wall.width, wall.height) / 3);
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angles[wall.direction]);
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 3;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(-size, 0);
+    ctx.lineTo(size, 0);
+    ctx.moveTo(size - size * 0.6, -size * 0.55);
+    ctx.lineTo(size, 0);
+    ctx.lineTo(size - size * 0.6, size * 0.55);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
+    ctx.font = "600 11px ui-sans-serif, system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText(`${wall.speed}/s`, cx, wall.y + wall.height + 3);
+  }
+
+  private drawGuns(): void {
+    const { ctx } = this;
+
+    for (const gun of this.draft.guns) {
+      const stats = GUNS[gun.kind];
+      ctx.fillStyle = stats.color;
+      ctx.fillRect(gun.x - GUN_HALF, gun.y - GUN_HALF * 0.55, GUN_HALF * 2, GUN_HALF * 1.1);
+      ctx.fillRect(gun.x - GUN_HALF * 0.35, gun.y - GUN_HALF * 0.1, GUN_HALF * 0.7, GUN_HALF);
+
+      ctx.fillStyle = "#08101f";
+      ctx.font = "bold 9px ui-monospace, monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(stats.tag, gun.x, gun.y - 1);
+    }
   }
 
   private drawSpots(): void {

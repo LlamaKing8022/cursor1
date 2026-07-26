@@ -1,5 +1,5 @@
-import type { ArenaStyle, GameMode, Rect } from "./types";
-import type { CustomMap } from "./map";
+import type { ArenaStyle, GameMode, Obstacle, Rect } from "./types";
+import type { CustomMap, MapWall } from "./map";
 import type { Rng } from "./rng";
 
 export const BATTLE_WORLD = { width: 1000, height: 640 };
@@ -37,17 +37,34 @@ export function createObstacles(
   bounds: Rect,
   rng: Rng,
   customMap?: CustomMap | null,
-): Rect[] {
+): Obstacle[] {
   if (customMap) {
-    return customMap.walls.map((wall) => ({ ...wall }));
+    return customMap.walls.map((wall) => toObstacle(wall));
   }
-  if (style === "open") {
-    return mode === "race" ? raceGates(bounds, rng, 0.55) : [];
-  }
-  if (mode === "race") {
-    return style === "maze" ? raceGates(bounds, rng, 1) : raceGates(bounds, rng, 0.8);
-  }
-  return style === "maze" ? battleMaze(bounds, rng) : battlePillars(bounds, rng);
+  const generated =
+    style === "open"
+      ? mode === "race"
+        ? raceGates(bounds, rng, 0.55)
+        : []
+      : mode === "race"
+        ? raceGates(bounds, rng, style === "maze" ? 1 : 0.8)
+        : style === "maze"
+          ? battleMaze(bounds, rng)
+          : battlePillars(bounds, rng);
+
+  return generated.map((rect) => ({ ...rect, vx: 0, vy: 0 }));
+}
+
+function toObstacle(wall: MapWall): Obstacle {
+  const speed = wall.direction === "none" ? 0 : wall.speed;
+  return {
+    x: wall.x,
+    y: wall.y,
+    width: wall.width,
+    height: wall.height,
+    vx: wall.direction === "left" ? -speed : wall.direction === "right" ? speed : 0,
+    vy: wall.direction === "up" ? -speed : wall.direction === "down" ? speed : 0,
+  };
 }
 
 function battlePillars(bounds: Rect, rng: Rng): Rect[] {

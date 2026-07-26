@@ -173,9 +173,38 @@
                 <button type="button" class="btn tool" data-tool="wall">Wall</button>
                 <button type="button" class="btn tool" data-tool="spawn">Spawn zone</button>
                 <button type="button" class="btn tool" data-tool="powerup">Power-up</button>
+                <button type="button" class="btn tool" data-tool="gun">Gun</button>
                 <button type="button" class="btn tool" data-tool="erase">Erase</button>
               </div>
             </fieldset>
+
+            <div class="field">
+              <label for="editor-direction">Wall movement</label>
+              <select id="editor-direction">
+                <option value="none" selected>Static</option>
+                <option value="right">Moves right</option>
+                <option value="left">Moves left</option>
+                <option value="up">Moves up</option>
+                <option value="down">Moves down</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="editor-wall-speed">
+                Wall speed <output id="editor-wall-speed-out">35</output>
+              </label>
+              <input id="editor-wall-speed" type="range" min="10" max="120" step="5" value="35" />
+            </div>
+
+            <div class="field">
+              <label for="editor-gun">Gun type</label>
+              <select id="editor-gun">
+                <option value="pistol" selected>Pistol — steady</option>
+                <option value="smg">SMG — fast, weak</option>
+                <option value="shotgun">Shotgun — spread</option>
+                <option value="sniper">Sniper — heavy</option>
+              </select>
+            </div>
 
             <div class="field">
               <label for="editor-kind">Pad type</label>

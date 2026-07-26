@@ -1,4 +1,5 @@
 import type { ArenaStyle, PowerUpKind, Rect } from "./types";
+import { isGunKind, type GunKind } from "./guns";
 
 /** Height is fixed so the renderer's camera and aspect handling stay simple. */
 export const MAP_HEIGHT = 640;
@@ -7,6 +8,10 @@ export const MAX_MAP_WIDTH = 3600;
 
 export const MIN_WALL_SIZE = 14;
 export const MIN_ZONE_SIZE = 40;
+
+export const MIN_WALL_SPEED = 10;
+export const MAX_WALL_SPEED = 120;
+export const DEFAULT_WALL_SPEED = 35;
 
 /** `random` re-rolls the pickup type every time the pad respawns. */
 export type SpotKind = PowerUpKind | "random";
@@ -17,19 +22,35 @@ export interface PowerUpSpot {
   kind: SpotKind;
 }
 
+export type WallDirection = "none" | "left" | "right" | "up" | "down";
+
+/** A wall with a direction patrols that way and reverses at the map edges. */
+export interface MapWall extends Rect {
+  direction: WallDirection;
+  speed: number;
+}
+
+export interface GunSpot {
+  x: number;
+  y: number;
+  kind: GunKind;
+}
+
 export interface CustomMap {
   id: string;
   name: string;
   width: number;
   height: number;
   palette: ArenaStyle;
-  walls: Rect[];
+  walls: MapWall[];
   spawnZones: Rect[];
   powerUpSpots: PowerUpSpot[];
+  guns: GunSpot[];
 }
 
 const PALETTES: ArenaStyle[] = ["open", "pillars", "maze"];
 const SPOT_KINDS: SpotKind[] = ["random", "heal", "rage", "speed", "shield"];
+const WALL_DIRECTIONS: WallDirection[] = ["none", "left", "right", "up", "down"];
 
 export function createEmptyMap(name = "New map"): CustomMap {
   return {
@@ -41,6 +62,7 @@ export function createEmptyMap(name = "New map"): CustomMap {
     walls: [],
     spawnZones: [],
     powerUpSpots: [],
+    guns: [],
   };
 }
 
@@ -55,6 +77,7 @@ export function cloneMap(map: CustomMap): CustomMap {
     walls: map.walls.map((wall) => ({ ...wall })),
     spawnZones: map.spawnZones.map((zone) => ({ ...zone })),
     powerUpSpots: map.powerUpSpots.map((spot) => ({ ...spot })),
+    guns: map.guns.map((gun) => ({ ...gun })),
   };
 }
 
@@ -92,6 +115,34 @@ function sanitizeRect(raw: unknown, width: number, minSize: number): Rect | null
   return rect;
 }
 
+/** Maps saved before moving walls existed simply have no direction. */
+function sanitizeWall(raw: unknown, width: number): MapWall | null {
+  const rect = sanitizeRect(raw, width, MIN_WALL_SIZE);
+  if (!rect) return null;
+
+  const candidate = raw as Partial<MapWall>;
+  const direction = WALL_DIRECTIONS.includes(candidate.direction as WallDirection)
+    ? (candidate.direction as WallDirection)
+    : "none";
+  const speed = isFiniteNumber(candidate.speed)
+    ? clamp(Math.round(candidate.speed), MIN_WALL_SPEED, MAX_WALL_SPEED)
+    : DEFAULT_WALL_SPEED;
+
+  return { ...rect, direction, speed };
+}
+
+function sanitizeGun(raw: unknown, width: number): GunSpot | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const candidate = raw as Partial<GunSpot>;
+  if (!isFiniteNumber(candidate.x) || !isFiniteNumber(candidate.y)) return null;
+
+  return {
+    x: clamp(candidate.x, 16, width - 16),
+    y: clamp(candidate.y, 16, MAP_HEIGHT - 16),
+    kind: isGunKind(candidate.kind) ? candidate.kind : "pistol",
+  };
+}
+
 function sanitizeSpot(raw: unknown, width: number): PowerUpSpot | null {
   if (typeof raw !== "object" || raw === null) return null;
   const candidate = raw as Partial<PowerUpSpot>;
@@ -119,8 +170,8 @@ export function normalizeMap(raw: unknown): CustomMap | null {
 
   const walls = Array.isArray(candidate.walls)
     ? candidate.walls
-        .map((wall) => sanitizeRect(wall, width, MIN_WALL_SIZE))
-        .filter((wall): wall is Rect => wall !== null)
+        .map((wall) => sanitizeWall(wall, width))
+        .filter((wall): wall is MapWall => wall !== null)
     : [];
   const spawnZones = Array.isArray(candidate.spawnZones)
     ? candidate.spawnZones
@@ -131,6 +182,9 @@ export function normalizeMap(raw: unknown): CustomMap | null {
     ? candidate.powerUpSpots
         .map((spot) => sanitizeSpot(spot, width))
         .filter((spot): spot is PowerUpSpot => spot !== null)
+    : [];
+  const guns = Array.isArray(candidate.guns)
+    ? candidate.guns.map((gun) => sanitizeGun(gun, width)).filter((gun): gun is GunSpot => gun !== null)
     : [];
 
   const name =
@@ -147,6 +201,7 @@ export function normalizeMap(raw: unknown): CustomMap | null {
     walls,
     spawnZones,
     powerUpSpots,
+    guns,
   };
 }
 

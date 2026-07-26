@@ -1,4 +1,5 @@
 import type { CustomMap } from "./map";
+import type { GunKind } from "./guns";
 
 export type GameMode = "battle" | "race";
 
@@ -9,6 +10,40 @@ export interface Rect {
   y: number;
   width: number;
   height: number;
+}
+
+/** A wall in play. Static walls simply have zero velocity. */
+export interface Obstacle extends Rect {
+  vx: number;
+  vy: number;
+}
+
+export interface GunInstance {
+  id: number;
+  kind: GunKind;
+  x: number;
+  y: number;
+  /** Cube id currently carrying it, or null while it lies on the ground. */
+  holder: number | null;
+  ammo: number;
+  /** Seconds until the next shot is allowed. */
+  cooldown: number;
+  /** Seconds until a dropped gun can be picked up again. */
+  reloadTimer: number;
+  /** Current aim angle in radians, for drawing the barrel. */
+  aim: number;
+}
+
+export interface Bullet {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  damage: number;
+  /** Cube id that fired it, so bullets cannot hit their owner. */
+  owner: number;
+  color: string;
 }
 
 export interface Cube {
@@ -88,8 +123,10 @@ export interface SimSnapshot {
   cubes: Cube[];
   powerUps: PowerUp[];
   particles: Particle[];
+  guns: GunInstance[];
+  bullets: Bullet[];
   bounds: Rect;
-  obstacles: Rect[];
+  obstacles: Obstacle[];
   finishX: number | null;
   winner: Cube | null;
   standings: Cube[];

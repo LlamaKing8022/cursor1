@@ -215,6 +215,46 @@ check(
 await page.click('.tool[data-tool="powerup"]');
 await clickOn(560, 320);
 
+console.log("\nmoving walls");
+await page.click('.tool[data-tool="wall"]');
+check(
+  (await page.locator("#editor-direction").isDisabled()) === false,
+  "wall movement selector enabled for the wall tool",
+);
+await page.selectOption("#editor-direction", "right");
+await page.locator("#editor-wall-speed").fill("60");
+check((await page.locator("#editor-wall-speed-out").textContent()) === "60", "wall speed output updates");
+await dragOn(620, 90, 680, 240);
+check(
+  ((await page.locator("#editor-status").textContent()) ?? "").includes("Moving wall"),
+  "moving wall reported",
+);
+check(
+  ((await page.locator("#editor-hint").textContent()) ?? "").includes("(1 moving)"),
+  "hint counts the moving wall",
+);
+await page.selectOption("#editor-direction", "none");
+
+console.log("\nplacing guns");
+await page.click('.tool[data-tool="gun"]');
+check(
+  (await page.locator("#editor-gun").isDisabled()) === false,
+  "gun selector enabled for the gun tool",
+);
+check(
+  await page.locator("#editor-direction").isDisabled(),
+  "wall movement selector disabled outside the wall tool",
+);
+await page.selectOption("#editor-gun", "sniper");
+await clickOn(400, 340);
+check(
+  ((await page.locator("#editor-status").textContent()) ?? "").includes("Sniper"),
+  "sniper placed",
+);
+await page.selectOption("#editor-gun", "smg");
+await clickOn(300, 380);
+check(((await page.locator("#editor-hint").textContent()) ?? "").includes("2 guns"), "two guns placed");
+
 console.log("\nsaving the map");
 await page.click("#editor-save");
 check(
@@ -234,6 +274,29 @@ check(
   ((await page.locator("#mode-label").textContent()) ?? "").includes("Test map"),
   `match runs on the custom map (${await page.locator("#mode-label").textContent()})`,
 );
+
+// Guns must survive the round trip into a live match. Whether a bouncing cube
+// reaches a gun is down to chance, so poll rather than waiting a fixed time,
+// and restart the match if it finishes before anyone grabs one.
+async function waitForGunPickup(attempts = 3, perAttemptMs = 12_000): Promise<boolean> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const deadline = Date.now() + perAttemptMs;
+    while (Date.now() < deadline) {
+      const rows = await page.locator("#leaderboard .row-meta").allTextContents();
+      if (rows.some((row) => /PST|SMG|SHT|SNP/.test(row))) return true;
+      if (await page.locator("#result").isVisible()) break;
+      await page.waitForTimeout(150);
+    }
+    if (await page.locator("#result").isVisible()) {
+      await page.click("#btn-again");
+      await page.waitForTimeout(400);
+    }
+  }
+  return false;
+}
+
+await page.click('.btn-speed[data-speed="1"]');
+check(await waitForGunPickup(), "a cube picked up a gun during the match");
 
 console.log("\ncustom map is selectable in setup after a reload");
 await page.reload({ waitUntil: "load" });
