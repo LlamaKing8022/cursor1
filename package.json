@@ -1,0 +1,26 @@
+{
+  "name": "cube-arena",
+  "version": "1.0.0",
+  "description": "A spectator simulator where colored cubes bounce around an arena and fight to be the last one alive or race to the finish line.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx tests/simulation.test.ts"
+  },
+  "keywords": [
+    "simulation",
+    "battle-royale",
+    "canvas",
+    "game"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "tsx": "^4.23.1",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5"
+  }
+}
