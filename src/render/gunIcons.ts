@@ -1,4 +1,4 @@
-import type { GunKind } from "../sim/guns";
+import { GUN_HALF, type GunKind } from "../sim/guns";
 
 /**
  * Foreground paths from game-icons.net (CC BY 3.0).
@@ -13,6 +13,9 @@ const GUN_ICON_PATHS: Record<GunKind, string> = {
   sniper:
     "M256 16S136 76 136 226v120c0 30 0 30 30 30h180c30 0 30 0 30-30V226C376 76 256 16 256 16zm0 75s60 30 60 135v60H196v-60c0-105 60-135 60-135zM148.63 420.998A12.632 12.632 0 0 0 136 433.63v49.737a12.632 12.632 0 0 0 12.63 12.63h214.74a12.632 12.632 0 0 0 12.63-12.63V433.63A12.632 12.632 0 0 0 363.37 421H148.63z",
 };
+
+/** Dark ink used on top of coloured gun pads — matches power-up glyphs. */
+export const GUN_ICON_INK = "#08101f";
 
 const ICON_VIEW = 512;
 const pathCache = new Map<GunKind, Path2D>();
@@ -46,11 +49,49 @@ export function drawGunIcon(
   ctx.restore();
 }
 
+/** Coloured pickup pad with a dark weapon silhouette, like power-up tiles. */
+export function drawGunPickup(
+  ctx: CanvasRenderingContext2D,
+  kind: GunKind,
+  x: number,
+  y: number,
+  color: string,
+  alpha = 1,
+): void {
+  const pad = GUN_HALF;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = color;
+  ctx.fillRect(x - pad, y - pad, pad * 2, pad * 2);
+  drawGunIcon(ctx, kind, x, y, pad * 1.65, GUN_ICON_INK);
+  ctx.restore();
+}
+
+/** Weapon silhouette sticking out of a cube, rotated toward aim. */
+export function drawGunHeld(
+  ctx: CanvasRenderingContext2D,
+  kind: GunKind,
+  x: number,
+  y: number,
+  aim: number,
+  reach: number,
+  color: string,
+): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(aim);
+  ctx.translate(reach, 0);
+  drawGunIcon(ctx, kind, 0, 0, 22, color);
+  ctx.restore();
+}
+
 /** Small inline icon for the standings panel. */
-export function createGunIconElement(kind: GunKind, color: string, size = 14): HTMLSpanElement {
+export function createGunIconElement(kind: GunKind, color: string, size = 16): HTMLSpanElement {
   const wrap = document.createElement("span");
   wrap.className = "gun-icon";
   wrap.dataset.gunKind = kind;
+  wrap.style.background = color;
 
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("viewBox", `0 0 ${ICON_VIEW} ${ICON_VIEW}`);
@@ -60,7 +101,7 @@ export function createGunIconElement(kind: GunKind, color: string, size = 14): H
 
   const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
   path.setAttribute("d", GUN_ICON_PATHS[kind]);
-  path.setAttribute("fill", color);
+  path.setAttribute("fill", GUN_ICON_INK);
 
   svg.append(path);
   wrap.append(svg);

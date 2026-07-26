@@ -387,7 +387,10 @@ canvas {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
+  padding: 2px;
+  border-radius: 4px;
   line-height: 0;
+  box-shadow: 0 0 0 1px rgba(8, 16, 31, 0.35);
 }
 
 .row-bar {

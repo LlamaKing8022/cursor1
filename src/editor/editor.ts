@@ -13,7 +13,7 @@ import {
   type WallDirection,
 } from "../sim/map";
 import { GUNS, GUN_HALF, type GunKind } from "../sim/guns";
-import { drawGunIcon } from "../render/gunIcons";
+import { drawGunPickup } from "../render/gunIcons";
 import { themeFor } from "../render/theme";
 import { deleteMap, findMap, loadMaps, saveMap } from "./storage";
 import type { ArenaStyle, GameMode, Rect } from "../sim/types";
@@ -714,11 +714,7 @@ export class MapEditor {
 
     for (const gun of this.draft.guns) {
       const stats = GUNS[gun.kind];
-      ctx.fillStyle = stats.color;
-      ctx.fillRect(gun.x - GUN_HALF, gun.y - GUN_HALF * 0.55, GUN_HALF * 2, GUN_HALF * 1.1);
-      ctx.fillRect(gun.x - GUN_HALF * 0.35, gun.y - GUN_HALF * 0.1, GUN_HALF * 0.7, GUN_HALF);
-
-      drawGunIcon(ctx, gun.kind, gun.x, gun.y, 20, stats.color);
+      drawGunPickup(ctx, gun.kind, gun.x, gun.y, stats.color);
     }
   }
 

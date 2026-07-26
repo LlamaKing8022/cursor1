@@ -8,7 +8,7 @@ import type {
   SimSnapshot,
 } from "../sim/types";
 import { GUNS, GUN_HALF } from "../sim/guns";
-import { drawGunIcon } from "./gunIcons";
+import { drawGunHeld, drawGunPickup } from "./gunIcons";
 import { themeFor, type ArenaTheme } from "./theme";
 
 interface Camera {
@@ -356,11 +356,7 @@ export class Renderer {
 
       ctx.save();
       ctx.globalAlpha = reloading ? 0.3 : 1;
-      ctx.fillStyle = stats.color;
-      ctx.fillRect(gun.x - GUN_HALF, gun.y - GUN_HALF * 0.55, GUN_HALF * 2, GUN_HALF * 1.1);
-      ctx.fillRect(gun.x - GUN_HALF * 0.35, gun.y - GUN_HALF * 0.1, GUN_HALF * 0.7, GUN_HALF);
-
-      drawGunIcon(ctx, gun.kind, gun.x, gun.y, 20, stats.color);
+      drawGunPickup(ctx, gun.kind, gun.x, gun.y, stats.color);
       ctx.restore();
 
       if (reloading) {
@@ -386,12 +382,7 @@ export class Renderer {
       if (!holder || !holder.alive) continue;
 
       const stats = GUNS[gun.kind];
-      ctx.save();
-      ctx.translate(holder.x, holder.y);
-      ctx.rotate(gun.aim);
-      ctx.fillStyle = stats.color;
-      ctx.fillRect(holder.half - 2, -3, 18, 6);
-      ctx.restore();
+      drawGunHeld(ctx, gun.kind, holder.x, holder.y, gun.aim, holder.half + 2, stats.color);
 
       this.drawAmmoPips(gun, holder);
     }
