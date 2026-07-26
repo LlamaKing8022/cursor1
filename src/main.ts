@@ -180,14 +180,14 @@ function buildRow(cube: Cube, index: number): HTMLLIElement {
     const ratio = cube.hp / cube.maxHp;
     const kos = `${cube.kills} KO`;
     const gun = cube.alive ? sim.gunHeldBy(cube.id) : null;
-    const carrying = gun ? ` · ${GUNS[gun.kind].tag}` : "";
+    const carrying = gun ? ` · ${GUNS[gun.kind].icon}` : "";
     meta.textContent = cube.alive ? `${Math.ceil(cube.hp)} hp · ${kos}${carrying}` : `out · ${kos}`;
     fill.style.width = `${Math.max(0, ratio) * 100}%`;
     fill.style.background = ratio > 0.5 ? "var(--good)" : ratio > 0.25 ? "#ffd166" : "var(--danger)";
   } else {
     const progress = sim.finishX ? Math.min(1, cube.x / sim.finishX) : 0;
     const gun = sim.gunHeldBy(cube.id);
-    const carrying = gun && cube.place === 0 ? `${GUNS[gun.kind].tag} · ` : "";
+    const carrying = gun && cube.place === 0 ? `${GUNS[gun.kind].icon} · ` : "";
     meta.textContent =
       cube.place > 0 ? `${cube.finishTime.toFixed(1)}s` : `${carrying}${Math.round(progress * 100)}%`;
     fill.style.width = `${progress * 100}%`;

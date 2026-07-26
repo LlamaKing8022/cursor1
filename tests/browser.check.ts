@@ -283,7 +283,7 @@ async function waitForGunPickup(attempts = 3, perAttemptMs = 12_000): Promise<bo
     const deadline = Date.now() + perAttemptMs;
     while (Date.now() < deadline) {
       const rows = await page.locator("#leaderboard .row-meta").allTextContents();
-      if (rows.some((row) => /PST|SMG|SHT|SNP/.test(row))) return true;
+      if (rows.some((row) => /🔫|💨|💥|🎯/.test(row))) return true;
       if (await page.locator("#result").isVisible()) break;
       await page.waitForTimeout(150);
     }
