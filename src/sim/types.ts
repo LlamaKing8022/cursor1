@@ -115,8 +115,12 @@ export interface SimConfig {
   startingHp: number;
   /** Battle only: cubes are grouped into teams and the last team standing wins. */
   teamMode: boolean;
+  /** Battle team count when team mode is on (2–4). */
+  teamCount: number;
   /** Battle only: cube-cube impacts deal damage. Guns still hurt enemies. */
   collisionDamage: boolean;
+  /** Generated-arena height in pixels. Custom maps use their own height. */
+  arenaHeight: number;
   /** When set, replaces the generated arena with a hand-built map. */
   customMap?: CustomMap | null;
 }

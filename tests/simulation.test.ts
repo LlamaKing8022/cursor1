@@ -1,4 +1,5 @@
 import { FIXED_STEP, Simulation } from "../src/sim/simulation";
+import { DEFAULT_ARENA_HEIGHT } from "../src/sim/arena";
 import type { ArenaStyle, GameMode, SimConfig } from "../src/sim/types";
 
 let failures = 0;
@@ -27,7 +28,9 @@ function baseConfig(overrides: Partial<SimConfig> = {}): SimConfig {
     powerUpsEnabled: true,
     startingHp: 100,
     teamMode: false,
+    teamCount: 2,
     collisionDamage: true,
+    arenaHeight: DEFAULT_ARENA_HEIGHT,
     ...overrides,
   };
 }
@@ -315,6 +318,12 @@ group("collision damage off keeps cubes healthy from bumps alone", () => {
   for (let i = 0; i < 600; i += 1) sim.step(FIXED_STEP);
   const allFull = sim.cubes.every((cube) => cube.hp === cube.maxHp && cube.alive);
   check(allFull, "open arena with collision damage off: cubes kept full hp during early chaos");
+});
+
+group("arena height changes generated bounds", () => {
+  const sim = new Simulation(baseConfig({ arenaHeight: 960, arenaStyle: "open" }));
+  check(sim.bounds.height === 960, "taller generated arena uses the requested height");
+  check(sim.bounds.height !== DEFAULT_ARENA_HEIGHT, "height differs from the default");
 });
 
 console.log(`\n${checks - failures}/${checks} checks passed`);

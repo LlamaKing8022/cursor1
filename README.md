@@ -35,7 +35,9 @@ afterward to fill out the podium.
 | Speed | Baseline cube velocity, 0.5x to 2.5x |
 | Starting HP | Battle only; higher means longer fights |
 | Team mode | Battle only; cubes fight in coloured teams and the last team standing wins |
+| Teams | Battle team mode only; choose 2 to 4 teams |
 | Collision damage | Battle only; toggle whether cube-cube impacts deal damage (guns still hurt) |
+| Arena height | Generated arenas only; 640 to 1200 px tall (custom maps keep their own height) |
 | Arena | `open` (empty), `pillars` (a few obstacles), `maze` (tight and chaotic) — each has its own colour palette — or one of your own maps |
 | Power-ups | Toggle pickups on or off |
 | Seed | Leave blank for random, or enter a value to replay an exact match |
@@ -93,7 +95,8 @@ Gun icons are from [game-icons.net](https://game-icons.net) (CC BY 3.0).
 
 Notes on how maps behave:
 
-- Map height is fixed at 640 so the camera and aspect handling stay predictable.
+- Map height defaults to 640 for custom maps in the editor, but generated arenas can be
+  640–1200 px tall from Setup.
 - In Race mode the finish line sits near the right edge, marked in the editor, so wider maps
   make longer tracks.
 - Guns are lethal, so a map with several of them produces much shorter battles.

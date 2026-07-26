@@ -4,7 +4,7 @@ import { colorFor, nameFor } from "./roster";
 import { mapFinishX, type CustomMap, type SpotKind } from "./map";
 import { GUNS, GUN_HALF } from "./guns";
 import type { SimEvent } from "./events";
-import { teamCountFor, teamColor, teamForCube } from "./teams";
+import { teamColor, teamForCube } from "./teams";
 import type {
   Bullet,
   Cube,
@@ -88,9 +88,11 @@ export class Simulation {
   constructor(config: SimConfig) {
     this.config = config;
     this.rng = new Rng(config.seed);
-    this.teamCount = config.teamMode ? teamCountFor(config.cubeCount) : 1;
+    this.teamCount = config.teamMode
+      ? Math.min(Math.max(2, config.teamCount), config.cubeCount)
+      : 1;
     this.customMap = config.customMap ?? null;
-    this.bounds = createBounds(config.mode, config.arenaStyle, this.customMap);
+    this.bounds = createBounds(config.mode, config.arenaStyle, this.customMap, config.arenaHeight);
     this.obstacles = createObstacles(
       config.mode,
       config.arenaStyle,

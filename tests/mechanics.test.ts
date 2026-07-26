@@ -1,4 +1,5 @@
 import { FIXED_STEP, Simulation } from "../src/sim/simulation";
+import { DEFAULT_ARENA_HEIGHT } from "../src/sim/arena";
 import { MAP_HEIGHT, createEmptyMap, normalizeMap, type CustomMap } from "../src/sim/map";
 import { GUNS } from "../src/sim/guns";
 import type { GameMode, SimConfig } from "../src/sim/types";
@@ -29,7 +30,9 @@ function configFor(map: CustomMap, mode: GameMode, overrides: Partial<SimConfig>
     powerUpsEnabled: false,
     startingHp: 100,
     teamMode: false,
+    teamCount: 2,
     collisionDamage: true,
+    arenaHeight: DEFAULT_ARENA_HEIGHT,
     customMap: map,
     ...overrides,
   };

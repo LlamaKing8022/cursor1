@@ -4,6 +4,9 @@ import type { Rng } from "./rng";
 
 export const BATTLE_WORLD = { width: 1000, height: 640 };
 export const RACE_WORLD = { height: 640 };
+export const DEFAULT_ARENA_HEIGHT = 640;
+export const MIN_ARENA_HEIGHT = 640;
+export const MAX_ARENA_HEIGHT = 1200;
 
 /** Race tracks are long and scroll horizontally; length scales with difficulty. */
 export function raceTrackLength(style: ArenaStyle): number {
@@ -21,14 +24,20 @@ export function createBounds(
   mode: GameMode,
   style: ArenaStyle,
   customMap?: CustomMap | null,
+  arenaHeight = DEFAULT_ARENA_HEIGHT,
 ): Rect {
   if (customMap) {
     return { x: 0, y: 0, width: customMap.width, height: customMap.height };
   }
+  const height = clampArenaHeight(arenaHeight);
   if (mode === "race") {
-    return { x: 0, y: 0, width: raceTrackLength(style), height: RACE_WORLD.height };
+    return { x: 0, y: 0, width: raceTrackLength(style), height };
   }
-  return { x: 0, y: 0, width: BATTLE_WORLD.width, height: BATTLE_WORLD.height };
+  return { x: 0, y: 0, width: BATTLE_WORLD.width, height };
+}
+
+function clampArenaHeight(value: number): number {
+  return Math.min(MAX_ARENA_HEIGHT, Math.max(MIN_ARENA_HEIGHT, Math.round(value)));
 }
 
 export function createObstacles(

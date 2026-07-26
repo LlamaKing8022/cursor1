@@ -1,4 +1,5 @@
 import "./style.css";
+import { DEFAULT_ARENA_HEIGHT } from "./sim/arena";
 import { FIXED_STEP, Simulation } from "./sim/simulation";
 import { Renderer } from "./render/renderer";
 import { randomSeed, seedFromString } from "./sim/rng";
@@ -59,6 +60,12 @@ const ui = {
   teams: required<HTMLInputElement>("input-teams"),
   collisionDamage: required<HTMLInputElement>("input-collision-damage"),
   battleOptions: required<HTMLDivElement>("field-battle-options"),
+  teamCount: required<HTMLInputElement>("input-team-count"),
+  teamCountOut: required<HTMLOutputElement>("out-team-count"),
+  teamCountField: required<HTMLDivElement>("field-team-count"),
+  arenaHeight: required<HTMLInputElement>("input-arena-height"),
+  arenaHeightOut: required<HTMLOutputElement>("out-arena-height"),
+  arenaHeightField: required<HTMLDivElement>("field-arena-height"),
   seedInput: required<HTMLInputElement>("input-seed"),
 };
 
@@ -71,7 +78,9 @@ let config: SimConfig = {
   powerUpsEnabled: true,
   startingHp: 100,
   teamMode: false,
+  teamCount: 2,
   collisionDamage: true,
+  arenaHeight: DEFAULT_ARENA_HEIGHT,
   customMap: null,
 };
 
@@ -372,7 +381,9 @@ function syncSetupForm(): void {
   ui.arena.value = config.customMap ? `custom:${config.customMap.id}` : config.arenaStyle;
   ui.powerUps.checked = config.powerUpsEnabled;
   ui.teams.checked = config.teamMode;
+  ui.teamCount.value = String(config.teamCount);
   ui.collisionDamage.checked = config.collisionDamage;
+  ui.arenaHeight.value = String(config.arenaHeight);
   ui.seedInput.value = "";
   refreshSetupOutputs();
 }
@@ -386,9 +397,22 @@ function refreshSetupOutputs(): void {
   ui.countOut.textContent = ui.count.value;
   ui.speedOut.textContent = `${Number(ui.speed.value).toFixed(1)}x`;
   ui.hpOut.textContent = ui.hp.value;
+  ui.teamCountOut.textContent = ui.teamCount.value;
+  ui.arenaHeightOut.textContent = ui.arenaHeight.value;
+
   const battle = selectedMode() === "battle";
+  const customMap = ui.arena.value.startsWith("custom:");
   ui.hpField.hidden = !battle;
   ui.battleOptions.hidden = !battle;
+  ui.teamCountField.hidden = !battle || !ui.teams.checked;
+  ui.arenaHeightField.hidden = customMap;
+
+  const maxTeams = Math.min(4, Number(ui.count.value));
+  ui.teamCount.max = String(maxTeams);
+  if (Number(ui.teamCount.value) > maxTeams) {
+    ui.teamCount.value = String(maxTeams);
+    ui.teamCountOut.textContent = ui.teamCount.value;
+  }
 }
 
 ui.setupButton.addEventListener("click", openSetup);
@@ -399,6 +423,8 @@ ui.cancel.addEventListener("click", () => {
 });
 
 ui.setupForm.addEventListener("input", refreshSetupOutputs);
+ui.arena.addEventListener("change", refreshSetupOutputs);
+ui.teams.addEventListener("change", refreshSetupOutputs);
 
 ui.setupForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -419,7 +445,9 @@ ui.setupForm.addEventListener("submit", (event) => {
     powerUpsEnabled: ui.powerUps.checked,
     startingHp: Number(ui.hp.value),
     teamMode: ui.teams.checked,
+    teamCount: Number(ui.teamCount.value),
     collisionDamage: ui.collisionDamage.checked,
+    arenaHeight: Number(ui.arenaHeight.value),
     customMap,
   });
 });
