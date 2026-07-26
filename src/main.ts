@@ -3,6 +3,8 @@ import { FIXED_STEP, Simulation } from "./sim/simulation";
 import { Renderer } from "./render/renderer";
 import { randomSeed, seedFromString } from "./sim/rng";
 import { GUNS } from "./sim/guns";
+import type { GunKind } from "./sim/guns";
+import { createGunIconElement } from "./render/gunIcons";
 import { MapEditor } from "./editor/editor";
 import { findMap, loadMaps } from "./editor/storage";
 import type { CustomMap } from "./sim/map";
@@ -151,6 +153,15 @@ function updateLeaderboard(): void {
   ui.leaderboard.replaceChildren(...rows);
 }
 
+function appendGunCarrying(meta: HTMLElement, kind: GunKind, prefix = false): void {
+  const icon = createGunIconElement(kind, GUNS[kind].color);
+  if (prefix) {
+    meta.append(icon, document.createTextNode(" · "));
+    return;
+  }
+  meta.append(document.createTextNode(" · "), icon);
+}
+
 function buildRow(cube: Cube, index: number): HTMLLIElement {
   const row = document.createElement("li");
   row.className = "row";
@@ -180,16 +191,17 @@ function buildRow(cube: Cube, index: number): HTMLLIElement {
     const ratio = cube.hp / cube.maxHp;
     const kos = `${cube.kills} KO`;
     const gun = cube.alive ? sim.gunHeldBy(cube.id) : null;
-    const carrying = gun ? ` · ${GUNS[gun.kind].icon}` : "";
-    meta.textContent = cube.alive ? `${Math.ceil(cube.hp)} hp · ${kos}${carrying}` : `out · ${kos}`;
+    meta.textContent = cube.alive ? `${Math.ceil(cube.hp)} hp · ${kos}` : `out · ${kos}`;
+    if (gun) appendGunCarrying(meta, gun.kind);
     fill.style.width = `${Math.max(0, ratio) * 100}%`;
     fill.style.background = ratio > 0.5 ? "var(--good)" : ratio > 0.25 ? "#ffd166" : "var(--danger)";
   } else {
     const progress = sim.finishX ? Math.min(1, cube.x / sim.finishX) : 0;
     const gun = sim.gunHeldBy(cube.id);
-    const carrying = gun && cube.place === 0 ? `${GUNS[gun.kind].icon} · ` : "";
-    meta.textContent =
-      cube.place > 0 ? `${cube.finishTime.toFixed(1)}s` : `${carrying}${Math.round(progress * 100)}%`;
+    if (gun && cube.place === 0) {
+      appendGunCarrying(meta, gun.kind, true);
+    }
+    meta.append(document.createTextNode(cube.place > 0 ? `${cube.finishTime.toFixed(1)}s` : `${Math.round(progress * 100)}%`));
     fill.style.width = `${progress * 100}%`;
     fill.style.background = cube.color;
   }

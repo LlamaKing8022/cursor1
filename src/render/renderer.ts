@@ -7,7 +7,8 @@ import type {
   Rect,
   SimSnapshot,
 } from "../sim/types";
-import { GUNS, GUN_HALF, GUN_ICON_FONT } from "../sim/guns";
+import { GUNS, GUN_HALF } from "../sim/guns";
+import { drawGunIcon } from "./gunIcons";
 import { themeFor, type ArenaTheme } from "./theme";
 
 interface Camera {
@@ -359,10 +360,7 @@ export class Renderer {
       ctx.fillRect(gun.x - GUN_HALF, gun.y - GUN_HALF * 0.55, GUN_HALF * 2, GUN_HALF * 1.1);
       ctx.fillRect(gun.x - GUN_HALF * 0.35, gun.y - GUN_HALF * 0.1, GUN_HALF * 0.7, GUN_HALF);
 
-      ctx.font = GUN_ICON_FONT;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(stats.icon, gun.x, gun.y);
+      drawGunIcon(ctx, gun.kind, gun.x, gun.y, 20, stats.color);
       ctx.restore();
 
       if (reloading) {

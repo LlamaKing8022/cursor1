@@ -282,8 +282,8 @@ async function waitForGunPickup(attempts = 3, perAttemptMs = 12_000): Promise<bo
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const deadline = Date.now() + perAttemptMs;
     while (Date.now() < deadline) {
-      const rows = await page.locator("#leaderboard .row-meta").allTextContents();
-      if (rows.some((row) => /🔫|💨|💥|🎯/.test(row))) return true;
+      const hasGun = (await page.locator("#leaderboard .gun-icon").count()) > 0;
+      if (hasGun) return true;
       if (await page.locator("#result").isVisible()) break;
       await page.waitForTimeout(150);
     }

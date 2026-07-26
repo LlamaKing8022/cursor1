@@ -84,8 +84,10 @@ was left in it.
 Bullets are blocked by walls, so cover works. In Race mode cubes have no health, so bullets
 shove them off course instead of damaging them.
 
-The carried gun shows as a barrel on the cube with ammo pips underneath, and its tag appears
+The carried gun shows as a barrel on the cube with ammo pips underneath, and its icon appears
 in the standings row.
+
+Gun icons are from [game-icons.net](https://game-icons.net) (CC BY 3.0).
 
 Notes on how maps behave:
 
@@ -201,3 +203,5 @@ awarding the win to whoever got furthest.
 ## License
 
 MIT
+
+Gun icons by [game-icons.net](https://game-icons.net) contributors, used under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/).

@@ -2,8 +2,6 @@ export type GunKind = "pistol" | "smg" | "shotgun" | "sniper";
 
 export interface GunStats {
   name: string;
-  /** Emoji shown on the pickup and in the standings list. */
-  icon: string;
   damage: number;
   /** Seconds between shots. */
   fireInterval: number;
@@ -23,7 +21,6 @@ export interface GunStats {
 export const GUNS: Record<GunKind, GunStats> = {
   pistol: {
     name: "Pistol",
-    icon: "🔫",
     damage: 9,
     fireInterval: 0.5,
     magazine: 9,
@@ -36,7 +33,6 @@ export const GUNS: Record<GunKind, GunStats> = {
   },
   smg: {
     name: "SMG",
-    icon: "💨",
     damage: 4,
     fireInterval: 0.11,
     magazine: 28,
@@ -49,7 +45,6 @@ export const GUNS: Record<GunKind, GunStats> = {
   },
   shotgun: {
     name: "Shotgun",
-    icon: "💥",
     damage: 5,
     fireInterval: 0.95,
     magazine: 5,
@@ -62,7 +57,6 @@ export const GUNS: Record<GunKind, GunStats> = {
   },
   sniper: {
     name: "Sniper",
-    icon: "🎯",
     damage: 34,
     fireInterval: 1.7,
     magazine: 3,
@@ -79,10 +73,6 @@ export const GUN_KINDS = Object.keys(GUNS) as GunKind[];
 
 /** Half-extent of a gun lying on the ground, used for pickup overlap. */
 export const GUN_HALF = 12;
-
-/** Canvas font string that renders emoji reliably across platforms. */
-export const GUN_ICON_FONT =
-  '16px system-ui, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
 
 export function isGunKind(value: unknown): value is GunKind {
   return typeof value === "string" && value in GUNS;
