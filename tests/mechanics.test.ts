@@ -1,6 +1,6 @@
 import { FIXED_STEP, Simulation } from "../src/sim/simulation";
 import { DEFAULT_ARENA_HEIGHT } from "../src/sim/arena";
-import { MAP_HEIGHT, BREAKABLE_WALL_HP, createEmptyMap, normalizeMap, type CustomMap } from "../src/sim/map";
+import { MAP_HEIGHT, createEmptyMap, normalizeMap, type CustomMap } from "../src/sim/map";
 import { GUNS } from "../src/sim/guns";
 import type { GameMode, SimConfig } from "../src/sim/types";
 
@@ -559,20 +559,61 @@ group("maps saved before these features still load", () => {
   }
 });
 
-group("breakable walls can be shot apart", () => {
-  const map = gunMap("sniper");
+group("breakable walls crumble after enough cube hits", () => {
+  const map = createEmptyMap("Brick");
   map.walls = [
-    { x: 340, y: 0, width: 40, height: MAP_HEIGHT, direction: "none", speed: 35, breakable: true },
+    {
+      x: 500,
+      y: 250,
+      width: 60,
+      height: 140,
+      direction: "none",
+      speed: 35,
+      breakable: true,
+      hitsToBreak: 3,
+    },
   ];
-  const sim = new Simulation(configFor(map, "battle", { cubeCount: 2 }));
+  const sim = new Simulation(configFor(map, "race", { cubeCount: 1 }));
+  const cube = sim.cubes[0];
   const wall = sim.obstacles[0];
 
   check(wall.breakable, "wall is marked breakable");
-  check(wall.hp === BREAKABLE_WALL_HP, `wall starts with full hp (${wall.hp})`);
+  check(wall.hitsRemaining === 3, `wall starts with 3 hits (${wall.hitsRemaining})`);
 
+  for (let hit = 0; hit < 3 && sim.obstacles.length > 0; hit += 1) {
+    cube.x = 430;
+    cube.y = 320;
+    cube.vx = 360;
+    cube.vy = 0;
+
+    for (let step = 0; step < 240 && sim.obstacles.length > 0; step += 1) {
+      sim.step(FIXED_STEP);
+    }
+  }
+
+  check(sim.obstacles.length === 0, "breakable wall was destroyed by cube impacts");
+});
+
+group("bullets do not break breakable walls", () => {
+  const map = gunMap("sniper");
+  map.walls = [
+    {
+      x: 340,
+      y: 0,
+      width: 40,
+      height: MAP_HEIGHT,
+      direction: "none",
+      speed: 35,
+      breakable: true,
+      hitsToBreak: 2,
+    },
+  ];
+  const sim = new Simulation(configFor(map, "battle", { cubeCount: 2 }));
   const gun = sim.guns[0];
   const shooter = sim.cubes[0];
   const behindWall = sim.cubes[1];
+  const wall = sim.obstacles[0];
+
   shooter.x = 250;
   shooter.y = 320;
   behindWall.x = 600;
@@ -580,17 +621,17 @@ group("breakable walls can be shot apart", () => {
   gun.holder = shooter.id;
   gun.cooldown = 0;
 
-  let destroyed = false;
-  for (let i = 0; i < 600 && !destroyed; i += 1) {
+  for (let i = 0; i < 600; i += 1) {
     shooter.vx = 0;
     shooter.vy = 0;
     behindWall.vx = 0;
     behindWall.vy = 0;
     sim.step(FIXED_STEP);
-    if (sim.obstacles.length === 0) destroyed = true;
   }
 
-  check(destroyed, "breakable wall was destroyed by gunfire");
+  check(sim.obstacles.length === 1, "breakable wall stayed up under gunfire");
+  check(wall.hitsRemaining === 2, `hits remaining unchanged (${wall.hitsRemaining})`);
+  check(behindWall.hp === behindWall.maxHp, "the cube behind cover was never hit");
 });
 
 group("solid custom walls still block bullets", () => {
@@ -624,10 +665,22 @@ group("solid custom walls still block bullets", () => {
 group("breakable flag survives validation", () => {
   const cleaned = normalizeMap({
     width: 1200,
-    walls: [{ x: 100, y: 100, width: 80, height: 80, direction: "none", speed: 35, breakable: true }],
+    walls: [
+      {
+        x: 100,
+        y: 100,
+        width: 80,
+        height: 80,
+        direction: "none",
+        speed: 35,
+        breakable: true,
+        hitsToBreak: 5,
+      },
+    ],
   });
 
   check(cleaned?.walls[0].breakable === true, "breakable flag preserved");
+  check(cleaned?.walls[0].hitsToBreak === 5, `hits to break preserved (${cleaned?.walls[0].hitsToBreak})`);
   check(cleaned?.walls[0].direction === "none", "direction still normalized");
 });
 

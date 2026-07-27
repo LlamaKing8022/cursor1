@@ -14,7 +14,9 @@ export const MIN_ZONE_SIZE = 40;
 export const MIN_WALL_SPEED = 10;
 export const MAX_WALL_SPEED = 120;
 export const DEFAULT_WALL_SPEED = 35;
-export const BREAKABLE_WALL_HP = 80;
+export const DEFAULT_BREAKABLE_HITS = 3;
+export const MIN_BREAKABLE_HITS = 1;
+export const MAX_BREAKABLE_HITS = 20;
 
 /** `random` re-rolls the pickup type every time the pad respawns. */
 export type SpotKind = PowerUpKind | "random";
@@ -31,8 +33,10 @@ export type WallDirection = "none" | "left" | "right" | "up" | "down";
 export interface MapWall extends Rect {
   direction: WallDirection;
   speed: number;
-  /** Breakable walls can be shot apart during a match. */
+  /** Breakable walls crumble after cubes slam into them enough times. */
   breakable?: boolean;
+  /** Hits required before a breakable wall is destroyed. */
+  hitsToBreak?: number;
 }
 
 export interface GunSpot {
@@ -133,7 +137,16 @@ function sanitizeWall(raw: unknown, width: number, mapHeight: number): MapWall |
     ? clamp(Math.round(candidate.speed), MIN_WALL_SPEED, MAX_WALL_SPEED)
     : DEFAULT_WALL_SPEED;
 
-  return { ...rect, direction, speed, breakable: candidate.breakable === true };
+  const breakable = candidate.breakable === true;
+  const hitsToBreak = breakable
+    ? clamp(
+        isFiniteNumber(candidate.hitsToBreak) ? Math.round(candidate.hitsToBreak) : DEFAULT_BREAKABLE_HITS,
+        MIN_BREAKABLE_HITS,
+        MAX_BREAKABLE_HITS,
+      )
+    : undefined;
+
+  return { ...rect, direction, speed, breakable, hitsToBreak };
 }
 
 function sanitizeGun(raw: unknown, width: number, mapHeight: number): GunSpot | null {

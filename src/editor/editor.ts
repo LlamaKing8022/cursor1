@@ -4,6 +4,7 @@ import {
   cloneMap,
   createEmptyMap,
   createMapId,
+  DEFAULT_BREAKABLE_HITS,
   mapFinishX,
   normalizeMap,
   rectContains,
@@ -14,6 +15,7 @@ import {
 } from "../sim/map";
 import { GUNS, GUN_HALF, type GunKind } from "../sim/guns";
 import { drawGunPickup } from "../render/gunIcons";
+import { drawBrickWall } from "../render/brickWall";
 import { themeFor } from "../render/theme";
 import { deleteMap, findMap, loadMaps, saveMap } from "./storage";
 import type { ArenaStyle, GameMode, Rect } from "../sim/types";
@@ -65,6 +67,9 @@ export class MapEditor {
     direction: element<HTMLSelectElement>("editor-direction"),
     wallSpeed: element<HTMLInputElement>("editor-wall-speed"),
     wallSpeedOut: element<HTMLOutputElement>("editor-wall-speed-out"),
+    wallHits: element<HTMLInputElement>("editor-breakable-hits"),
+    wallHitsOut: element<HTMLOutputElement>("editor-breakable-hits-out"),
+    breakableHitsField: element<HTMLDivElement>("field-breakable-hits"),
     gun: element<HTMLSelectElement>("editor-gun"),
     width: element<HTMLInputElement>("editor-width"),
     widthOut: element<HTMLOutputElement>("editor-width-out"),
@@ -133,6 +138,9 @@ export class MapEditor {
     this.ui.wallSpeed.addEventListener("input", () => {
       this.ui.wallSpeedOut.textContent = this.ui.wallSpeed.value;
     });
+    this.ui.wallHits.addEventListener("input", () => {
+      this.ui.wallHitsOut.textContent = this.ui.wallHits.value;
+    });
     this.ui.palette.addEventListener("change", () => {
       this.draft.palette = this.ui.palette.value as ArenaStyle;
       this.render();
@@ -190,6 +198,7 @@ export class MapEditor {
     this.ui.gun.disabled = tool !== "gun";
     this.ui.direction.disabled = tool !== "wall" && tool !== "breakable-wall";
     this.ui.wallSpeed.disabled = tool !== "wall" && tool !== "breakable-wall";
+    this.ui.breakableHitsField.hidden = tool !== "breakable-wall";
     this.updateHint();
   }
 
@@ -426,6 +435,8 @@ export class MapEditor {
         direction,
         speed: Number(this.ui.wallSpeed.value),
         breakable: this.tool === "breakable-wall",
+        hitsToBreak:
+          this.tool === "breakable-wall" ? Number(this.ui.wallHits.value) : undefined,
       };
       this.draft.walls.push(wall);
       const kind = this.tool === "breakable-wall" ? "Breakable wall" : "Wall";
@@ -711,25 +722,10 @@ export class MapEditor {
 
     this.draft.walls.forEach((wall, index) => {
       if (wall.breakable) {
-        ctx.fillStyle = theme.breakableObstacleFill;
-        ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
-        ctx.strokeStyle = theme.breakableObstacleStroke;
-        ctx.lineWidth = 2;
-        ctx.strokeRect(wall.x, wall.y, wall.width, wall.height);
-
-        ctx.strokeStyle = theme.breakableObstacleCrack;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(wall.x + wall.width * 0.22, wall.y + wall.height * 0.18);
-        ctx.lineTo(wall.x + wall.width * 0.48, wall.y + wall.height * 0.52);
-        ctx.lineTo(wall.x + wall.width * 0.34, wall.y + wall.height * 0.82);
-        ctx.stroke();
-
-        ctx.fillStyle = "rgba(58, 34, 18, 0.9)";
-        ctx.font = "700 12px ui-sans-serif, system-ui, sans-serif";
-        ctx.textAlign = "left";
-        ctx.textBaseline = "top";
-        ctx.fillText("BRK", wall.x + 6, wall.y + 5);
+        drawBrickWall(ctx, wall, {
+          hitsRemaining: wall.hitsToBreak ?? DEFAULT_BREAKABLE_HITS,
+          showHits: true,
+        });
       } else {
         ctx.fillStyle = theme.obstacleFills[index % theme.obstacleFills.length];
         ctx.fillRect(wall.x, wall.y, wall.width, wall.height);

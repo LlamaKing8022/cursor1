@@ -9,6 +9,7 @@ import type {
 } from "../sim/types";
 import { GUNS, GUN_HALF } from "../sim/guns";
 import { drawGunHeld, drawGunPickup } from "./gunIcons";
+import { drawBrickWall } from "./brickWall";
 import { themeFor, type ArenaTheme } from "./theme";
 
 interface Camera {
@@ -304,34 +305,10 @@ export class Renderer {
   }
 
   private drawBreakableObstacle(rect: Obstacle): void {
-    const { ctx } = this;
-
-    ctx.fillStyle = this.theme.breakableObstacleFill;
-    ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
-    ctx.strokeStyle = this.theme.breakableObstacleStroke;
-    ctx.lineWidth = 2;
-    ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
-
-    ctx.strokeStyle = this.theme.breakableObstacleCrack;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(rect.x + rect.width * 0.2, rect.y + rect.height * 0.15);
-    ctx.lineTo(rect.x + rect.width * 0.45, rect.y + rect.height * 0.55);
-    ctx.lineTo(rect.x + rect.width * 0.3, rect.y + rect.height * 0.85);
-    ctx.moveTo(rect.x + rect.width * 0.62, rect.y + rect.height * 0.2);
-    ctx.lineTo(rect.x + rect.width * 0.78, rect.y + rect.height * 0.72);
-    ctx.stroke();
-
-    if (rect.maxHp > 0 && rect.hp < rect.maxHp) {
-      const barWidth = Math.max(18, Math.min(rect.width - 8, 56));
-      const barX = rect.x + (rect.width - barWidth) / 2;
-      const barY = rect.y + rect.height - 8;
-      const ratio = Math.max(0, rect.hp / rect.maxHp);
-      ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
-      ctx.fillRect(barX, barY, barWidth, 4);
-      ctx.fillStyle = ratio > 0.35 ? "#f0d7b2" : "#ff8c42";
-      ctx.fillRect(barX, barY, barWidth * ratio, 4);
-    }
+    drawBrickWall(this.ctx, rect, {
+      hitsRemaining: rect.hitsRemaining,
+      showHits: true,
+    });
 
     if (rect.vx !== 0 || rect.vy !== 0) {
       this.drawMotionArrow(rect);

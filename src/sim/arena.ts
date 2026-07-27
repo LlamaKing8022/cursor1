@@ -1,6 +1,6 @@
 import type { ArenaStyle, GameMode, Obstacle, Rect } from "./types";
 import type { CustomMap, MapWall } from "./map";
-import { BREAKABLE_WALL_HP } from "./map";
+import { DEFAULT_BREAKABLE_HITS } from "./map";
 import type { Rng } from "./rng";
 
 export const BATTLE_WORLD = { width: 1000, height: 640 };
@@ -66,12 +66,13 @@ export function createObstacles(
 }
 
 function solidObstacle(rect: Rect): Obstacle {
-  return { ...rect, vx: 0, vy: 0, breakable: false, hp: 0, maxHp: 0 };
+  return { ...rect, vx: 0, vy: 0, breakable: false, hitsToBreak: 0, hitsRemaining: 0, hitCooldown: 0 };
 }
 
 function toObstacle(wall: MapWall): Obstacle {
   const speed = wall.direction === "none" ? 0 : wall.speed;
   const breakable = wall.breakable === true;
+  const hitsToBreak = breakable ? (wall.hitsToBreak ?? DEFAULT_BREAKABLE_HITS) : 0;
   return {
     x: wall.x,
     y: wall.y,
@@ -80,8 +81,9 @@ function toObstacle(wall: MapWall): Obstacle {
     vx: wall.direction === "left" ? -speed : wall.direction === "right" ? speed : 0,
     vy: wall.direction === "up" ? -speed : wall.direction === "down" ? speed : 0,
     breakable,
-    hp: breakable ? BREAKABLE_WALL_HP : 0,
-    maxHp: breakable ? BREAKABLE_WALL_HP : 0,
+    hitsToBreak,
+    hitsRemaining: hitsToBreak,
+    hitCooldown: 0,
   };
 }
 

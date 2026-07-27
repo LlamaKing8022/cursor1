@@ -17,8 +17,10 @@ export interface Obstacle extends Rect {
   vx: number;
   vy: number;
   breakable: boolean;
-  hp: number;
-  maxHp: number;
+  hitsToBreak: number;
+  hitsRemaining: number;
+  /** Prevents one bounce from registering multiple hits. */
+  hitCooldown: number;
 }
 
 export interface GunInstance {
