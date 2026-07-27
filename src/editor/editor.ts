@@ -5,7 +5,8 @@ import {
   createEmptyMap,
   createMapId,
   DEFAULT_BREAKABLE_HITS,
-  mapFinishX,
+  DEFAULT_FINISH_ZONE_HEIGHT,
+  DEFAULT_FINISH_ZONE_WIDTH,
   normalizeMap,
   rectContains,
   type CustomMap,
@@ -16,11 +17,12 @@ import {
 import { GUNS, GUN_HALF, type GunKind } from "../sim/guns";
 import { drawGunPickup } from "../render/gunIcons";
 import { drawBrickWall } from "../render/brickWall";
+import { drawFinishZone } from "../render/finishZone";
 import { themeFor } from "../render/theme";
 import { deleteMap, findMap, loadMaps, saveMap } from "./storage";
 import type { ArenaStyle, GameMode, Rect } from "../sim/types";
 
-type Tool = "wall" | "breakable-wall" | "spawn" | "powerup" | "gun" | "erase";
+type Tool = "wall" | "breakable-wall" | "spawn" | "finish" | "powerup" | "gun" | "erase";
 
 interface EditorOptions {
   onTest: (map: CustomMap, mode: GameMode) => void;
@@ -236,6 +238,7 @@ export class MapEditor {
     this.pushUndo();
     this.draft.walls = [];
     this.draft.spawnZones = [];
+    this.draft.finishZones = [];
     this.draft.powerUpSpots = [];
     this.setStatus("Cleared");
     this.render();
@@ -387,8 +390,14 @@ export class MapEditor {
     } else if (this.tool === "gun") {
       this.addGun(point.x, point.y);
     } else if (isClick) {
-      const size = this.tool === "wall" || this.tool === "breakable-wall" ? DEFAULT_WALL : DEFAULT_ZONE;
-      this.addRect(this.centeredRect(point.x, point.y, size));
+      if (this.tool === "finish") {
+        this.addFinishZone(this.centeredFinishZone(point.x, point.y));
+      } else {
+        const size = this.tool === "wall" || this.tool === "breakable-wall" ? DEFAULT_WALL : DEFAULT_ZONE;
+        this.addRect(this.centeredRect(point.x, point.y, size));
+      }
+    } else if (this.tool === "finish") {
+      this.addFinishZone(this.dragRect(drag.startX, drag.startY, point.x, point.y));
     } else {
       this.addRect(this.dragRect(drag.startX, drag.startY, point.x, point.y));
     }
@@ -411,6 +420,30 @@ export class MapEditor {
     const x2 = this.snap(Math.max(startX, endX));
     const y2 = this.snap(Math.max(startY, endY));
     return { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
+  }
+
+  private centeredFinishZone(x: number, y: number): Rect {
+    const width = DEFAULT_FINISH_ZONE_WIDTH;
+    const height = Math.min(DEFAULT_FINISH_ZONE_HEIGHT, this.draft.height);
+    return {
+      x: this.snap(x - width / 2),
+      y: this.snap(y - height / 2),
+      width,
+      height,
+    };
+  }
+
+  private addFinishZone(rect: Rect): void {
+    const clamped = this.clampRect(rect);
+    if (clamped.width < MIN_ZONE_SIZE || clamped.height < MIN_ZONE_SIZE) {
+      this.setStatus("That finish zone is too small");
+      return;
+    }
+
+    this.pushUndo();
+    this.draft.finishZones.push(clamped);
+    this.setStatus("Finish flag added");
+    this.updateHint();
   }
 
   private addRect(rect: Rect): void {
@@ -524,6 +557,16 @@ export class MapEditor {
       }
     }
 
+    for (let i = this.draft.finishZones.length - 1; i >= 0; i -= 1) {
+      if (rectContains(this.draft.finishZones[i], x, y)) {
+        this.pushUndo();
+        this.draft.finishZones.splice(i, 1);
+        this.setStatus("Finish flag removed");
+        this.updateHint();
+        return;
+      }
+    }
+
     for (let i = this.draft.walls.length - 1; i >= 0; i -= 1) {
       if (rectContains(this.draft.walls[i], x, y)) {
         this.pushUndo();
@@ -553,7 +596,7 @@ export class MapEditor {
     let wallLabel = `${this.draft.walls.length} walls`;
     if (breakable > 0) wallLabel += ` (${breakable} breakable)`;
     if (moving > 0) wallLabel += ` (${moving} moving)`;
-    const counts = `${wallLabel} · ${this.draft.spawnZones.length} spawn zones · ${this.draft.powerUpSpots.length} pads · ${this.draft.guns.length} guns`;
+    const counts = `${wallLabel} · ${this.draft.spawnZones.length} spawn zones · ${this.draft.finishZones.length} finish flags · ${this.draft.powerUpSpots.length} pads · ${this.draft.guns.length} guns`;
 
     const action =
       this.tool === "erase"
@@ -562,7 +605,9 @@ export class MapEditor {
           ? "Click to drop a power-up pad."
           : this.tool === "gun"
             ? "Click to drop a gun."
-            : "Drag to draw, or click for a default size.";
+            : this.tool === "finish"
+              ? "Drag or click to place a checkered finish flag."
+              : "Drag to draw, or click for a default size.";
     const fallback =
       this.draft.spawnZones.length === 0 ? " No spawn zones yet, so cubes use default positions." : "";
 
@@ -611,7 +656,7 @@ export class MapEditor {
     this.drawFloorSpeckles(theme);
 
     this.drawGrid();
-    this.drawFinishZone();
+    this.drawFinishZones();
     this.drawSpawnZones();
     this.drawWalls();
     this.drawSpots();
@@ -667,32 +712,18 @@ export class MapEditor {
     ctx.stroke();
   }
 
-  private drawFinishZone(): void {
+  private drawFinishZones(): void {
     const { ctx } = this;
     const theme = themeFor(this.draft.palette);
-    const finishX = mapFinishX(this.draft);
-    const goalWidth = 34;
-    const goalX = finishX - goalWidth;
-
-    const gradient = ctx.createRadialGradient(
-      goalX + goalWidth / 2,
-      this.draft.height / 2,
-      12,
-      goalX + goalWidth / 2,
-      this.draft.height / 2,
-      this.draft.height / 2,
-    );
-    gradient.addColorStop(0, theme.goalInner);
-    gradient.addColorStop(1, theme.goalOuter);
-    ctx.fillStyle = gradient;
-    ctx.fillRect(goalX, 0, goalWidth, this.draft.height);
-
-    ctx.strokeStyle = theme.border;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(finishX, 0);
-    ctx.lineTo(finishX, this.draft.height);
-    ctx.stroke();
+    for (const zone of this.draft.finishZones) {
+      drawFinishZone(ctx, zone, {
+        checkerLight: theme.checkerLight,
+        checkerDark: theme.checkerDark,
+        goalInner: theme.goalInner,
+        goalOuter: theme.goalOuter,
+        border: theme.border,
+      });
+    }
   }
 
   private drawSpawnZones(): void {

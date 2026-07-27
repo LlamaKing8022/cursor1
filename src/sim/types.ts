@@ -143,6 +143,7 @@ export interface SimSnapshot {
   bounds: Rect;
   obstacles: Obstacle[];
   finishX: number | null;
+  finishZones: Rect[];
   winner: Cube | null;
   standings: Cube[];
   shake: number;

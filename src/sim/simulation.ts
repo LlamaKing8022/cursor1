@@ -1,7 +1,7 @@
 import { Rng } from "./rng";
 import { createBounds, createObstacles } from "./arena";
 import { colorFor, nameFor } from "./roster";
-import { mapFinishX, type CustomMap, type SpotKind } from "./map";
+import { type CustomMap, type SpotKind } from "./map";
 import { GUNS, GUN_HALF } from "./guns";
 import type { SimEvent } from "./events";
 import { teamColor, teamForCube } from "./teams";
@@ -44,6 +44,7 @@ const RACE_PODIUM_GRACE = 2.5;
 const HARD_TIME_LIMIT = 180;
 const BREAKABLE_WALL_HIT_SPEED = 55;
 const BREAKABLE_WALL_HIT_COOLDOWN = 0.3;
+const CRUSH_CLEARANCE_MARGIN = 5;
 
 const POWERUP_INTERVAL = 4.5;
 const MAX_POWERUPS = 5;
@@ -55,6 +56,7 @@ export class Simulation {
   readonly bounds: Rect;
   readonly obstacles: Obstacle[];
   readonly finishX: number | null;
+  readonly finishZones: Rect[];
 
   cubes: Cube[] = [];
   powerUps: PowerUp[] = [];
@@ -104,12 +106,9 @@ export class Simulation {
     );
     this.spotCooldowns = (this.customMap?.powerUpSpots ?? []).map(() => 0);
     this.activeBounds = { ...this.bounds };
+    this.finishZones = this.customMap?.finishZones.map((zone) => ({ ...zone })) ?? [];
     this.finishX =
-      config.mode === "race"
-        ? this.customMap
-          ? mapFinishX(this.customMap)
-          : this.bounds.width - RACE_FINISH_MARGIN
-        : null;
+      config.mode === "race" && !this.customMap ? this.bounds.width - RACE_FINISH_MARGIN : null;
     this.stormDelay = STORM_BASE_DELAY + config.cubeCount;
     this.stormChipDelay = this.stormDelay + STORM_CHIP_GRACE;
     this.spawnCubes();
@@ -156,6 +155,7 @@ export class Simulation {
       this.collideWithObstacles(cube);
       // Moving walls can shove a cube past the edge, so clamp once more.
       this.collideWithBounds(cube);
+      this.checkCrush(cube);
     }
 
     this.resolveCubeCollisions();
@@ -188,6 +188,7 @@ export class Simulation {
       bounds: this.activeBounds,
       obstacles: this.obstacles,
       finishX: this.finishX,
+      finishZones: this.finishZones,
       winner: this.winner,
       standings: this.standings(),
       shake: this.shake,
@@ -462,6 +463,69 @@ export class Simulation {
 
   private fitsVertically(centre: number, half: number): boolean {
     return centre - half >= this.bounds.y - 0.5 && centre + half <= this.bounds.y + this.bounds.height + 0.5;
+  }
+
+  private overlapsVertically(cube: Cube, rect: Rect): boolean {
+    return cube.y + cube.half > rect.y && cube.y - cube.half < rect.y + rect.height;
+  }
+
+  private overlapsHorizontally(cube: Cube, rect: Rect): boolean {
+    return cube.x + cube.half > rect.x && cube.x - cube.half < rect.x + rect.width;
+  }
+
+  private clearanceX(cube: Cube): number {
+    let left = this.activeBounds.x;
+    let right = this.activeBounds.x + this.activeBounds.width;
+
+    for (const rect of this.obstacles) {
+      if (!this.overlapsVertically(cube, rect)) continue;
+      const mid = rect.x + rect.width / 2;
+      if (mid <= cube.x) left = Math.max(left, rect.x + rect.width);
+      else right = Math.min(right, rect.x);
+    }
+
+    return right - left;
+  }
+
+  private clearanceY(cube: Cube): number {
+    let top = this.activeBounds.y;
+    let bottom = this.activeBounds.y + this.activeBounds.height;
+
+    for (const rect of this.obstacles) {
+      if (!this.overlapsHorizontally(cube, rect)) continue;
+      const mid = rect.y + rect.height / 2;
+      if (mid <= cube.y) top = Math.max(top, rect.y + rect.height);
+      else bottom = Math.min(bottom, rect.y);
+    }
+
+    return bottom - top;
+  }
+
+  private checkCrush(cube: Cube): void {
+    if (!cube.alive || cube.place > 0) return;
+
+    const required = cube.half * 2;
+    const clearanceX = this.clearanceX(cube);
+    const clearanceY = this.clearanceY(cube);
+    const crushed =
+      clearanceX < required - CRUSH_CLEARANCE_MARGIN ||
+      clearanceY < required - CRUSH_CLEARANCE_MARGIN;
+
+    if (!crushed) return;
+
+    this.damage(cube, cube.hp, null);
+    this.spawnParticles(cube.x, cube.y, 20, cube.color);
+    this.emit({ type: "wall_hit", intensity: 1.2, x: cube.x });
+    this.shake = Math.min(1, this.shake + 0.35);
+  }
+
+  private cubeInFinishZone(cube: Cube, zone: Rect): boolean {
+    return (
+      cube.x >= zone.x &&
+      cube.x <= zone.x + zone.width &&
+      cube.y >= zone.y &&
+      cube.y <= zone.y + zone.height
+    );
   }
 
   private areAllies(a: Cube, b: Cube): boolean {
@@ -967,11 +1031,17 @@ export class Simulation {
   }
 
   private updateRaceProgress(dt: number): void {
-    if (this.finishX === null) return;
+    const hasFinishZones = this.finishZones.length > 0;
+    if (!hasFinishZones && this.finishX === null) return;
 
     for (const cube of this.cubes) {
       if (!cube.alive || cube.place > 0) continue;
-      if (cube.x + cube.half < this.finishX) continue;
+
+      const reached = hasFinishZones
+        ? this.finishZones.some((zone) => this.cubeInFinishZone(cube, zone))
+        : cube.x + cube.half >= this.finishX!;
+
+      if (!reached) continue;
 
       this.finishedCount += 1;
       cube.place = this.finishedCount;

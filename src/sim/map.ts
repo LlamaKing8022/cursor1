@@ -10,6 +10,9 @@ export const MAX_MAP_HEIGHT = 1200;
 
 export const MIN_WALL_SIZE = 14;
 export const MIN_ZONE_SIZE = 40;
+export const MIN_FINISH_ZONE_SIZE = 32;
+export const DEFAULT_FINISH_ZONE_WIDTH = 48;
+export const DEFAULT_FINISH_ZONE_HEIGHT = 220;
 
 export const MIN_WALL_SPEED = 10;
 export const MAX_WALL_SPEED = 120;
@@ -53,6 +56,7 @@ export interface CustomMap {
   palette: ArenaStyle;
   walls: MapWall[];
   spawnZones: Rect[];
+  finishZones: Rect[];
   powerUpSpots: PowerUpSpot[];
   guns: GunSpot[];
 }
@@ -70,6 +74,7 @@ export function createEmptyMap(name = "New map"): CustomMap {
     palette: "pillars",
     walls: [],
     spawnZones: [],
+    finishZones: [],
     powerUpSpots: [],
     guns: [],
   };
@@ -85,6 +90,7 @@ export function cloneMap(map: CustomMap): CustomMap {
     ...map,
     walls: map.walls.map((wall) => ({ ...wall })),
     spawnZones: map.spawnZones.map((zone) => ({ ...zone })),
+    finishZones: map.finishZones.map((zone) => ({ ...zone })),
     powerUpSpots: map.powerUpSpots.map((spot) => ({ ...spot })),
     guns: map.guns.map((gun) => ({ ...gun })),
   };
@@ -199,6 +205,11 @@ export function normalizeMap(raw: unknown): CustomMap | null {
         .map((zone) => sanitizeRect(zone, width, height, MIN_ZONE_SIZE))
         .filter((zone): zone is Rect => zone !== null)
     : [];
+  const finishZones = Array.isArray(candidate.finishZones)
+    ? candidate.finishZones
+        .map((zone) => sanitizeRect(zone, width, height, MIN_FINISH_ZONE_SIZE))
+        .filter((zone): zone is Rect => zone !== null)
+    : [];
   const powerUpSpots = Array.isArray(candidate.powerUpSpots)
     ? candidate.powerUpSpots
         .map((spot) => sanitizeSpot(spot, width, height))
@@ -221,14 +232,20 @@ export function normalizeMap(raw: unknown): CustomMap | null {
     palette,
     walls,
     spawnZones,
+    finishZones,
     powerUpSpots,
     guns,
   };
 }
 
-/** Where the race finish line sits on a custom map. */
+/** @deprecated Custom maps now use hand-placed finish zones instead. */
 export function mapFinishX(map: CustomMap): number {
   return map.width - 70;
+}
+
+export function raceTargetX(map: CustomMap): number | null {
+  if (map.finishZones.length === 0) return null;
+  return Math.min(...map.finishZones.map((zone) => zone.x));
 }
 
 export function rectContains(rect: Rect, x: number, y: number): boolean {

@@ -180,11 +180,15 @@ function updateHud(time: number): void {
   }
 
   const leader = sim.standings()[0];
-  if (!leader || sim.finishX === null) {
+  const targetX =
+    sim.finishZones.length > 0
+      ? Math.min(...sim.finishZones.map((zone) => zone.x))
+      : sim.finishX;
+  if (!leader || targetX === null) {
     ui.secondary.textContent = "—";
     return;
   }
-  const progress = Math.min(100, Math.round((leader.x / sim.finishX) * 100));
+  const progress = Math.min(100, Math.round((leader.x / targetX) * 100));
   ui.secondary.textContent = `${progress}%`;
 }
 
@@ -237,7 +241,11 @@ function buildRow(cube: Cube, index: number): HTMLLIElement {
     fill.style.width = `${Math.max(0, ratio) * 100}%`;
     fill.style.background = ratio > 0.5 ? "var(--good)" : ratio > 0.25 ? "#ffeb3b" : "var(--danger)";
   } else {
-    const progress = sim.finishX ? Math.min(1, cube.x / sim.finishX) : 0;
+    const targetX =
+      sim.finishZones.length > 0
+        ? Math.min(...sim.finishZones.map((zone) => zone.x))
+        : sim.finishX;
+    const progress = targetX ? Math.min(1, cube.x / targetX) : 0;
     const gun = sim.gunHeldBy(cube.id);
     if (gun && cube.place === 0) {
       appendGunCarrying(meta, gun.kind, true);

@@ -6,7 +6,6 @@ import {
   MAX_MAP_WIDTH,
   MIN_MAP_WIDTH,
   createEmptyMap,
-  mapFinishX,
   normalizeMap,
   type CustomMap,
 } from "../src/sim/map";
@@ -74,6 +73,7 @@ function sampleMap(): CustomMap {
     { x: 700, y: 120, kind: "heal" },
     { x: 700, y: 520, kind: "random" },
   ];
+  map.finishZones = [{ x: map.width - 80, y: 0, width: 50, height: MAP_HEIGHT }];
   return map;
 }
 
@@ -203,13 +203,14 @@ group("custom maps work in both modes and always finish", () => {
   }
 });
 
-group("race finish line sits at the end of a custom map", () => {
+group("race finish flags trigger wins on custom maps", () => {
   const map = sampleMap();
   const sim = new Simulation(configFor(map, "race"));
-  check(sim.finishX === mapFinishX(map), `finish line at ${sim.finishX} (map width ${map.width})`);
+  check(sim.finishZones.length === 1, `map has ${sim.finishZones.length} finish zone(s)`);
+  check(sim.finishX === null, "custom maps no longer auto-finish at the map edge");
 
   const finished = runMatch(configFor(map, "race", { seed: 99 }));
-  check(finished.winner?.place === 1, "a cube crossed the custom finish line");
+  check(finished.winner?.place === 1, "a cube reached the placed finish flag");
 });
 
 group("cubes stay inside a custom map", () => {

@@ -684,6 +684,40 @@ group("breakable flag survives validation", () => {
   check(cleaned?.walls[0].direction === "none", "direction still normalized");
 });
 
+group("cubes are crushed between closing walls", () => {
+  const map = createEmptyMap("Crush");
+  map.walls = [
+    { x: 300, y: 180, width: 40, height: 280, direction: "right", speed: 110 },
+    { x: 520, y: 180, width: 40, height: 280, direction: "left", speed: 110 },
+  ];
+  map.spawnZones = [{ x: 380, y: 250, width: 100, height: 140 }];
+  const sim = new Simulation(configFor(map, "race", { cubeCount: 1 }));
+  const cube = sim.cubes[0];
+  cube.x = 430;
+  cube.y = 320;
+
+  let crushed = false;
+  for (let i = 0; i < 900; i += 1) {
+    sim.step(FIXED_STEP);
+    if (!cube.alive) {
+      crushed = true;
+      break;
+    }
+  }
+
+  check(crushed, "cube was crushed between closing walls");
+});
+
+group("placed finish zones are preserved through validation", () => {
+  const cleaned = normalizeMap({
+    width: 1200,
+    finishZones: [{ x: 1000, y: 40, width: 48, height: 220 }],
+  });
+
+  check(cleaned?.finishZones.length === 1, "finish zone kept");
+  check((cleaned?.finishZones[0].width ?? 0) >= 32, "finish zone width is usable");
+});
+
 console.log(`\n${checks - failures}/${checks} checks passed`);
 if (failures > 0) {
   console.error(`${failures} check(s) failed`);

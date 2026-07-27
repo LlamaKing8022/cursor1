@@ -10,6 +10,7 @@ import type {
 import { GUNS, GUN_HALF } from "../sim/guns";
 import { drawGunHeld, drawGunPickup } from "./gunIcons";
 import { drawBrickWall } from "./brickWall";
+import { drawFinishZone } from "./finishZone";
 import { themeFor, type ArenaTheme } from "./theme";
 
 interface Camera {
@@ -85,7 +86,17 @@ export class Renderer {
     this.drawFloor(world, snapshot.bounds);
     this.drawDecor(world);
     this.drawGrid(world);
-    if (snapshot.finishX !== null) {
+    if (snapshot.finishZones.length > 0) {
+      for (const zone of snapshot.finishZones) {
+        drawFinishZone(ctx, zone, {
+          checkerLight: this.theme.checkerLight,
+          checkerDark: this.theme.checkerDark,
+          goalInner: this.theme.goalInner,
+          goalOuter: this.theme.goalOuter,
+          border: this.theme.border,
+        });
+      }
+    } else if (snapshot.finishX !== null) {
       this.drawFinishLine(snapshot.finishX, world);
     }
     this.drawBorders(world, snapshot.bounds);
