@@ -10,7 +10,8 @@ import { SoundEngine } from "./audio/sounds";
 import { teamColor, teamName } from "./sim/teams";
 import { MapEditor } from "./editor/editor";
 import { findMap, loadMaps } from "./editor/storage";
-import { findCloseSeeds } from "./sim/seedFinder";
+import { findCloseSeeds, findEngagingSeeds } from "./sim/seedFinder";
+import type { SeedScoring } from "./sim/seedFinder";
 import type { CustomMap } from "./sim/map";
 import type { ArenaStyle, Cube, GameMode, SimConfig } from "./sim/types";
 
@@ -69,6 +70,7 @@ const ui = {
   arenaHeightField: required<HTMLDivElement>("field-arena-height"),
   seedInput: required<HTMLInputElement>("input-seed"),
   findSeed: required<HTMLButtonElement>("btn-find-seed"),
+  findLivelySeed: required<HTMLButtonElement>("btn-find-lively-seed"),
   seedStatus: required<HTMLParagraphElement>("seed-status"),
   closeSeeds: required<HTMLInputElement>("input-close-seeds"),
 };
@@ -485,28 +487,34 @@ ui.closeSeeds.addEventListener("change", () => {
   preferCloseSeeds = ui.closeSeeds.checked;
 });
 
-ui.findSeed.addEventListener("click", () => {
+function setSeedSearchBusy(busy: boolean): void {
+  ui.findSeed.disabled = busy;
+  ui.findLivelySeed.disabled = busy;
+}
+
+function runSeedSearch(scoring: SeedScoring, busyMessage: string): void {
   void (async () => {
     const token = ++seedSearchToken;
-    ui.findSeed.disabled = true;
+    setSeedSearchBusy(true);
     ui.seedStatus.hidden = false;
     ui.seedStatus.classList.add("is-busy");
-    ui.seedStatus.textContent = "Scanning seeds for a tight match…";
+    ui.seedStatus.textContent = busyMessage;
 
     const base = configFromSetupForm();
     const startSeed = seedFromInput(ui.seedInput.value.trim());
+    const search = scoring === "engagement" ? findEngagingSeeds : findCloseSeeds;
 
     try {
-      const result = await findCloseSeeds(base, {
+      const result = await search(base, {
         startSeed,
-        scanCount: 140,
-        refineRadius: 5,
+        scanCount: scoring === "engagement" ? 160 : 140,
+        refineRadius: scoring === "engagement" ? 6 : 5,
         yieldEvery: 10,
         onProgress: (done, total, best) => {
           if (token !== seedSearchToken) return;
           const pct = Math.round((done / total) * 100);
           ui.seedStatus.textContent = best
-            ? `Scanning… ${pct}% · best so far: ${best.seed} (${Math.round(best.score * 100)}%)`
+            ? `Scanning… ${pct}% · best so far: ${best.summary}`
             : `Scanning… ${pct}%`;
         },
       });
@@ -515,9 +523,17 @@ ui.findSeed.addEventListener("click", () => {
       ui.seedStatus.classList.remove("is-busy");
       ui.seedStatus.textContent = `Found ${result.best.summary} after ${result.scanned} tries.`;
     } finally {
-      if (token === seedSearchToken) ui.findSeed.disabled = false;
+      if (token === seedSearchToken) setSeedSearchBusy(false);
     }
   })();
+}
+
+ui.findSeed.addEventListener("click", () => {
+  runSeedSearch("closeness", "Scanning seeds for a tight finish…");
+});
+
+ui.findLivelySeed.addEventListener("click", () => {
+  runSeedSearch("engagement", "Scanning seeds for early action and good pacing…");
 });
 
 ui.setupForm.addEventListener("submit", (event) => {

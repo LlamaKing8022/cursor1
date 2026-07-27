@@ -1,7 +1,10 @@
 import { describeCloseness, scoreMatchCloseness } from "./closeness";
+import { describeEngagement, scoreMatchEngagement } from "./engagement";
 import { runMatchToCompletion } from "./matchRunner";
 import { randomSeed } from "./rng";
 import type { SimConfig } from "./types";
+
+export type SeedScoring = "closeness" | "engagement";
 
 export interface SeedCandidate {
   seed: number;
@@ -19,6 +22,8 @@ export interface SeedFinderOptions {
   refineRadius?: number;
   /** How many top seeds to keep. */
   topK?: number;
+  /** Which scoring model to use. */
+  scoring?: SeedScoring;
   /** Optional callback after each simulated seed. */
   onProgress?: (done: number, total: number, best: SeedCandidate | null) => void;
   /** Yield to the event loop every N simulations (browser UI). */
@@ -39,11 +44,27 @@ function withSeed(config: Omit<SimConfig, "seed">, seed: number): SimConfig {
   return { ...config, seed: seed >>> 0 };
 }
 
-function evaluateSeed(config: Omit<SimConfig, "seed">, seed: number): SeedCandidate {
-  const { sim, timedOut } = runMatchToCompletion(withSeed(config, seed));
-  const closeness = scoreMatchCloseness(sim, withSeed(config, seed));
-  const score = timedOut ? closeness.score * 0.15 : closeness.score;
+function evaluateSeed(
+  config: Omit<SimConfig, "seed">,
+  seed: number,
+  scoring: SeedScoring,
+): SeedCandidate {
+  const fullConfig = withSeed(config, seed);
+  const { sim, timedOut } = runMatchToCompletion(fullConfig);
 
+  if (scoring === "engagement") {
+    const engagement = scoreMatchEngagement(sim, fullConfig);
+    const score = timedOut ? engagement.score * 0.12 : engagement.score;
+    return {
+      seed: seed >>> 0,
+      score,
+      summary: describeEngagement(seed, engagement),
+      duration: engagement.details.duration,
+    };
+  }
+
+  const closeness = scoreMatchCloseness(sim, fullConfig);
+  const score = timedOut ? closeness.score * 0.15 : closeness.score;
   return {
     seed: seed >>> 0,
     score,
@@ -99,19 +120,19 @@ async function maybeYield(done: number, yieldEvery: number): Promise<void> {
   }
 }
 
-/** Scans seeds and returns the closest matches for the given setup. */
-export async function findCloseSeeds(
+async function searchSeeds(
   config: Omit<SimConfig, "seed">,
-  options: SeedFinderOptions = {},
+  options: SeedFinderOptions,
 ): Promise<SeedFinderResult> {
   const topK = options.topK ?? DEFAULT_TOP_K;
   const yieldEvery = options.yieldEvery ?? 0;
+  const scoring = options.scoring ?? "closeness";
   const seeds = buildSeedList(options);
   const top: SeedCandidate[] = [];
   let best: SeedCandidate | null = null;
 
   for (let index = 0; index < seeds.length; index += 1) {
-    const candidate = evaluateSeed(config, seeds[index]);
+    const candidate = evaluateSeed(config, seeds[index], scoring);
     pushTop(top, candidate, topK);
     if (!best || candidate.score > best.score) best = candidate;
     options.onProgress?.(index + 1, seeds.length, best);
@@ -120,7 +141,7 @@ export async function findCloseSeeds(
 
   if (!best) {
     const fallbackSeed = options.startSeed ?? randomSeed();
-    best = evaluateSeed(config, fallbackSeed);
+    best = evaluateSeed(config, fallbackSeed, scoring);
     top.push(best);
   }
 
@@ -131,25 +152,42 @@ export async function findCloseSeeds(
   };
 }
 
+/** Scans seeds and returns the closest matches for the given setup. */
+export async function findCloseSeeds(
+  config: Omit<SimConfig, "seed">,
+  options: SeedFinderOptions = {},
+): Promise<SeedFinderResult> {
+  return searchSeeds(config, { ...options, scoring: "closeness" });
+}
+
+/** Scans seeds and favors lively matches with early action and sensible length. */
+export async function findEngagingSeeds(
+  config: Omit<SimConfig, "seed">,
+  options: SeedFinderOptions = {},
+): Promise<SeedFinderResult> {
+  return searchSeeds(config, { ...options, scoring: "engagement" });
+}
+
 /** Synchronous helper for tests and quick one-off lookups. */
 export function findBestSeedSync(
   config: Omit<SimConfig, "seed">,
   options: SeedFinderOptions = {},
 ): SeedFinderResult {
   const topK = options.topK ?? DEFAULT_TOP_K;
+  const scoring = options.scoring ?? "closeness";
   const seeds = buildSeedList(options);
   const top: SeedCandidate[] = [];
   let best: SeedCandidate | null = null;
 
   for (const seed of seeds) {
-    const candidate = evaluateSeed(config, seed);
+    const candidate = evaluateSeed(config, seed, scoring);
     pushTop(top, candidate, topK);
     if (!best || candidate.score > best.score) best = candidate;
     options.onProgress?.(top.length, seeds.length, best);
   }
 
   return {
-    best: best ?? evaluateSeed(config, options.startSeed ?? 1),
+    best: best ?? evaluateSeed(config, options.startSeed ?? 1, scoring),
     top: top.sort((a, b) => b.score - a.score || a.seed - b.seed),
     scanned: seeds.length,
   };

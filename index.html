@@ -168,7 +168,10 @@
           <label for="input-seed">Seed <small>(blank for random)</small></label>
           <div class="seed-row">
             <input id="input-seed" name="seed" type="text" inputmode="numeric" placeholder="random" />
-            <button type="button" class="btn" id="btn-find-seed">Find close seed</button>
+            <div class="seed-actions">
+              <button type="button" class="btn" id="btn-find-seed">Find close seed</button>
+              <button type="button" class="btn" id="btn-find-lively-seed">Find lively seed</button>
+            </div>
           </div>
           <p class="seed-status" id="seed-status" hidden></p>
           <label class="checkbox seed-preference">

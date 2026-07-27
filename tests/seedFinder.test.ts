@@ -1,4 +1,6 @@
 import { scoreMatchCloseness } from "../src/sim/closeness";
+import { scoreMatchEngagement } from "../src/sim/engagement";
+import { collectMatchStats } from "../src/sim/matchStats";
 import { runMatchToCompletion } from "../src/sim/matchRunner";
 import { findBestSeedSync } from "../src/sim/seedFinder";
 import { DEFAULT_ARENA_HEIGHT } from "../src/sim/arena";
@@ -92,6 +94,52 @@ group("race closeness rewards tight finishes", () => {
   const closeness = scoreMatchCloseness(sim, config);
   check(closeness.details.margin >= 0, "race margin is non-negative");
   check(closeness.score > 0, "finished race gets a positive score");
+});
+
+group("engagement scores stay in range", () => {
+  for (const seed of [3, 17, 99, 4242]) {
+    const config = baseConfig({ seed });
+    const { sim } = runMatchToCompletion(config);
+    const engagement = scoreMatchEngagement(sim, config);
+    check(engagement.score >= 0 && engagement.score <= 1, `seed ${seed}: engagement in [0, 1]`);
+    check(engagement.summary.length > 0, `seed ${seed}: engagement summary present`);
+    check(engagement.details.duration > 0, `seed ${seed}: engagement duration recorded`);
+  }
+});
+
+group("engagement finder returns a finished candidate", () => {
+  const { seed: _ignored, ...base } = baseConfig();
+  const result = findBestSeedSync(base, {
+    startSeed: 8000,
+    scanCount: 24,
+    refineRadius: 2,
+    topK: 3,
+    scoring: "engagement",
+  });
+
+  check(result.scanned > 0, "engagement scan ran");
+  check(result.best.score >= 0, "engagement best score is non-negative");
+  check(result.best.summary.includes("s)"), "engagement summary includes duration");
+});
+
+group("engagement scoring penalizes late action and long stalls", () => {
+  const { seed: _ignored, ...base } = baseConfig();
+
+  const slowConfig = { ...base, seed: 1, collisionDamage: false };
+  const { sim: slowSim } = runMatchToCompletion(slowConfig);
+  const slowStats = collectMatchStats(slowSim, slowConfig);
+  const slow = scoreMatchEngagement(slowSim, slowConfig);
+
+  const fastConfig = { ...base, seed: 2, collisionDamage: true };
+  const { sim: fastSim } = runMatchToCompletion(fastConfig);
+  const fastStats = collectMatchStats(fastSim, fastConfig);
+  const fast = scoreMatchEngagement(fastSim, fastConfig);
+
+  check(slowStats.firstDeathTime > fastStats.firstDeathTime, "slow sample starts fighting later");
+  check(
+    fast.score > slow.score,
+    `active match (${fast.score.toFixed(2)}) should beat stalled match (${slow.score.toFixed(2)})`,
+  );
 });
 
 console.log(`\n${checks} checks, ${failures} failures`);
