@@ -18,7 +18,7 @@ import { themeFor } from "../render/theme";
 import { deleteMap, findMap, loadMaps, saveMap } from "./storage";
 import type { ArenaStyle, GameMode, Rect } from "../sim/types";
 
-type Tool = "wall" | "spawn" | "powerup" | "gun" | "erase";
+type Tool = "wall" | "breakable-wall" | "spawn" | "powerup" | "gun" | "erase";
 
 interface EditorOptions {
   onTest: (map: CustomMap, mode: GameMode) => void;
@@ -188,8 +188,8 @@ export class MapEditor {
     // shift the canvas out from under the cursor.
     this.ui.kind.disabled = tool !== "powerup";
     this.ui.gun.disabled = tool !== "gun";
-    this.ui.direction.disabled = tool !== "wall";
-    this.ui.wallSpeed.disabled = tool !== "wall";
+    this.ui.direction.disabled = tool !== "wall" && tool !== "breakable-wall";
+    this.ui.wallSpeed.disabled = tool !== "wall" && tool !== "breakable-wall";
     this.updateHint();
   }
 
@@ -378,7 +378,7 @@ export class MapEditor {
     } else if (this.tool === "gun") {
       this.addGun(point.x, point.y);
     } else if (isClick) {
-      const size = this.tool === "wall" ? DEFAULT_WALL : DEFAULT_ZONE;
+      const size = this.tool === "wall" || this.tool === "breakable-wall" ? DEFAULT_WALL : DEFAULT_ZONE;
       this.addRect(this.centeredRect(point.x, point.y, size));
     } else {
       this.addRect(this.dragRect(drag.startX, drag.startY, point.x, point.y));
@@ -405,20 +405,33 @@ export class MapEditor {
   }
 
   private addRect(rect: Rect): void {
-    const minSize = this.tool === "wall" ? MIN_WALL_SIZE : MIN_ZONE_SIZE;
+    const minSize =
+      this.tool === "wall" || this.tool === "breakable-wall" ? MIN_WALL_SIZE : MIN_ZONE_SIZE;
     const clamped = this.clampRect(rect);
 
     if (clamped.width < minSize || clamped.height < minSize) {
-      this.setStatus(this.tool === "wall" ? "That wall is too small" : "That spawn zone is too small");
+      this.setStatus(
+        this.tool === "wall" || this.tool === "breakable-wall"
+          ? "That wall is too small"
+          : "That spawn zone is too small",
+      );
       return;
     }
 
     this.pushUndo();
-    if (this.tool === "wall") {
+    if (this.tool === "wall" || this.tool === "breakable-wall") {
       const direction = this.ui.direction.value as WallDirection;
-      const wall: MapWall = { ...clamped, direction, speed: Number(this.ui.wallSpeed.value) };
+      const wall: MapWall = {
+        ...clamped,
+        direction,
+        speed: Number(this.ui.wallSpeed.value),
+        breakable: this.tool === "breakable-wall",
+      };
       this.draft.walls.push(wall);
-      this.setStatus(direction === "none" ? "Wall added" : `Moving wall added (${direction})`);
+      const kind = this.tool === "breakable-wall" ? "Breakable wall" : "Wall";
+      this.setStatus(
+        direction === "none" ? `${kind} added` : `${kind} added (${direction})`,
+      );
     } else {
       this.draft.spawnZones.push(clamped);
       this.setStatus("Spawn zone added");
@@ -525,7 +538,10 @@ export class MapEditor {
 
   private updateHint(): void {
     const moving = this.draft.walls.filter((wall) => wall.direction !== "none").length;
-    const wallLabel = moving > 0 ? `${this.draft.walls.length} walls (${moving} moving)` : `${this.draft.walls.length} walls`;
+    const breakable = this.draft.walls.filter((wall) => wall.breakable).length;
+    let wallLabel = `${this.draft.walls.length} walls`;
+    if (breakable > 0) wallLabel += ` (${breakable} breakable)`;
+    if (moving > 0) wallLabel += ` (${moving} moving)`;
     const counts = `${wallLabel} · ${this.draft.spawnZones.length} spawn zones · ${this.draft.powerUpSpots.length} pads · ${this.draft.guns.length} guns`;
 
     const action =
@@ -694,11 +710,33 @@ export class MapEditor {
     const theme = themeFor(this.draft.palette);
 
     this.draft.walls.forEach((wall, index) => {
-      ctx.fillStyle = theme.obstacleFills[index % theme.obstacleFills.length];
-      ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
-      ctx.strokeStyle = wall.direction === "none" ? theme.obstacleStroke : "rgba(255, 255, 255, 0.7)";
-      ctx.lineWidth = wall.direction === "none" ? 2 : 2.5;
-      ctx.strokeRect(wall.x, wall.y, wall.width, wall.height);
+      if (wall.breakable) {
+        ctx.fillStyle = theme.breakableObstacleFill;
+        ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
+        ctx.strokeStyle = theme.breakableObstacleStroke;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(wall.x, wall.y, wall.width, wall.height);
+
+        ctx.strokeStyle = theme.breakableObstacleCrack;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(wall.x + wall.width * 0.22, wall.y + wall.height * 0.18);
+        ctx.lineTo(wall.x + wall.width * 0.48, wall.y + wall.height * 0.52);
+        ctx.lineTo(wall.x + wall.width * 0.34, wall.y + wall.height * 0.82);
+        ctx.stroke();
+
+        ctx.fillStyle = "rgba(58, 34, 18, 0.9)";
+        ctx.font = "700 12px ui-sans-serif, system-ui, sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+        ctx.fillText("BRK", wall.x + 6, wall.y + 5);
+      } else {
+        ctx.fillStyle = theme.obstacleFills[index % theme.obstacleFills.length];
+        ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
+        ctx.strokeStyle = wall.direction === "none" ? theme.obstacleStroke : "rgba(255, 255, 255, 0.7)";
+        ctx.lineWidth = wall.direction === "none" ? 2 : 2.5;
+        ctx.strokeRect(wall.x, wall.y, wall.width, wall.height);
+      }
 
       if (wall.direction !== "none") {
         this.drawWallArrow(wall);

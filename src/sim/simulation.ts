@@ -792,9 +792,13 @@ export class Simulation {
         continue;
       }
 
-      if (this.obstacles.some((rect) => this.pointInRect(bullet.x, bullet.y, rect))) {
+      const hitWall = this.obstacles.find((rect) => this.pointInRect(bullet.x, bullet.y, rect));
+      if (hitWall) {
         this.spawnParticles(bullet.x, bullet.y, 2, bullet.color);
         this.bullets.splice(i, 1);
+        if (hitWall.breakable) {
+          this.damageObstacle(hitWall, bullet.damage, bullet.x);
+        }
         continue;
       }
 
@@ -833,6 +837,26 @@ export class Simulation {
 
   private pointInRect(x: number, y: number, rect: Rect): boolean {
     return x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height;
+  }
+
+  private damageObstacle(obstacle: Obstacle, amount: number, x: number): void {
+    if (!obstacle.breakable || amount <= 0) return;
+
+    obstacle.hp -= amount;
+    if (obstacle.hp > 0) {
+      this.emit({ type: "wall_hit", intensity: 0.45, x });
+      return;
+    }
+
+    const cx = obstacle.x + obstacle.width / 2;
+    const cy = obstacle.y + obstacle.height / 2;
+    this.spawnParticles(cx, cy, 16, "#e8b878");
+    this.spawnParticles(cx, cy, 10, "#c99563");
+    this.emit({ type: "wall_break", x: cx });
+    this.shake = Math.min(1, this.shake + 0.12);
+
+    const index = this.obstacles.indexOf(obstacle);
+    if (index >= 0) this.obstacles.splice(index, 1);
   }
 
   private hasCustomSpots(): boolean {

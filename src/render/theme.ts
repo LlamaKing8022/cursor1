@@ -12,6 +12,9 @@ export interface ArenaTheme {
   /** Solid wall blocks. */
   obstacleFills: string[];
   obstacleStroke: string;
+  breakableObstacleFill: string;
+  breakableObstacleStroke: string;
+  breakableObstacleCrack: string;
   accent: string;
   goalInner: string;
   goalOuter: string;
@@ -31,6 +34,10 @@ const CHECKER_DARK = "#2a3a5c";
 const GOAL_INNER = "#c5e1a5";
 const GOAL_OUTER = "#2e7d32";
 
+const BREAKABLE_WALL = "#c99563";
+const BREAKABLE_WALL_DARK = "#a67a4d";
+const BREAKABLE_CRACK = "rgba(58, 34, 18, 0.55)";
+
 const BASE: Omit<ArenaTheme, "accent" | "obstacleFills"> = {
   checkerLight: CHECKER_LIGHT,
   checkerDark: CHECKER_DARK,
@@ -39,6 +46,9 @@ const BASE: Omit<ArenaTheme, "accent" | "obstacleFills"> = {
   grid: "rgba(142, 61, 135, 0.12)",
   border: "#1a1a1a",
   obstacleStroke: "#6d2f68",
+  breakableObstacleFill: BREAKABLE_WALL,
+  breakableObstacleStroke: BREAKABLE_WALL_DARK,
+  breakableObstacleCrack: BREAKABLE_CRACK,
   goalInner: GOAL_INNER,
   goalOuter: GOAL_OUTER,
   backdropTop: CHECKER_DARK,

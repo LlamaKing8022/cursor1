@@ -16,6 +16,9 @@ export interface Rect {
 export interface Obstacle extends Rect {
   vx: number;
   vy: number;
+  breakable: boolean;
+  hp: number;
+  maxHp: number;
 }
 
 export interface GunInstance {

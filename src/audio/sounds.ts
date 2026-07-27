@@ -40,6 +40,9 @@ export class SoundEngine {
         case "wall_hit":
           this.playWallHit(event.intensity, event.x);
           break;
+        case "wall_break":
+          this.playWallBreak(event.x);
+          break;
         case "cube_hit":
           this.playCubeHit(event.intensity, event.x);
           break;
@@ -109,6 +112,19 @@ export class SoundEngine {
 
     this.noiseBurst(dest, t, duration, gain, freq, duration * 1.4);
     this.tone(dest, t, freq * 0.7, freq * 0.35, duration, gain * 0.55, "triangle");
+  }
+
+  private playWallBreak(x: number): void {
+    if (!this.ctx) return;
+    if (!this.canPlay("wall_break", 60)) return;
+
+    const dest = this.pan(x);
+    if (!dest) return;
+
+    const t = this.ctx.currentTime;
+    this.noiseBurst(dest, t, 0.16, 0.55, 520, 0.2);
+    this.tone(dest, t, 220, 90, 0.18, 0.42, "triangle");
+    this.tone(dest, t + 0.04, 140, 70, 0.14, 0.28, "sawtooth");
   }
 
   private playCubeHit(intensity: number, x: number): void {
