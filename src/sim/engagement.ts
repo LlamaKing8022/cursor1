@@ -24,21 +24,35 @@ function mean(values: number[]): number {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
-/** Prefer matches that wrap up before the storm has to do all the work. */
+const LIVELY_TARGET_SECONDS = 40;
+
+/** Bell-curve preference around a target duration. */
+function durationSweetSpot(duration: number, target: number, spread: number): number {
+  const delta = (duration - target) / spread;
+  return Math.exp(-0.5 * delta * delta);
+}
+
+/** Lively battles should land near 40 seconds, not drag on. */
 function battleDurationScore(duration: number): number {
-  if (duration <= 42) return clamp01(0.72 + duration / 140);
-  if (duration <= 78) return 1;
-  if (duration <= 105) return clamp01(1 - (duration - 78) / 54);
-  if (duration <= 140) return clamp01(0.42 - (duration - 105) / 120);
-  return 0.12;
+  const sweetSpot = durationSweetSpot(duration, LIVELY_TARGET_SECONDS, 11);
+
+  if (duration < 18) return sweetSpot * 0.62;
+  if (duration > 95) return sweetSpot * 0.12;
+  if (duration > 70) return sweetSpot * 0.38;
+  if (duration > 55) return sweetSpot * 0.68;
+
+  return sweetSpot;
 }
 
 function raceDurationScore(duration: number, hitTimeLimit: boolean): number {
   if (hitTimeLimit) return 0.15;
-  if (duration <= 35) return 0.82;
-  if (duration <= 68) return 1;
-  if (duration <= 95) return clamp01(1 - (duration - 68) / 60);
-  return clamp01(0.35 - (duration - 95) / 140);
+
+  const sweetSpot = durationSweetSpot(duration, LIVELY_TARGET_SECONDS, 12);
+  if (duration < 16) return sweetSpot * 0.7;
+  if (duration > 90) return sweetSpot * 0.2;
+  if (duration > 65) return sweetSpot * 0.45;
+
+  return sweetSpot;
 }
 
 function battleFirstActionScore(firstDeathTime: number): number {
@@ -74,7 +88,7 @@ function battleFightSpan(stats: MatchStats): number {
   const spanScore = clamp01(spanRatio / 0.58);
   const cadenceScore = clamp01(spread / 18);
   const endClusterPenalty =
-    stats.duration > 70 && spanRatio < 0.22 ? 0.35 : spanRatio < 0.32 ? 0.68 : 1;
+    stats.duration > 48 && spanRatio < 0.22 ? 0.35 : spanRatio < 0.32 ? 0.68 : 1;
 
   return spanScore * 0.62 + cadenceScore * 0.38 * endClusterPenalty;
 }
@@ -89,19 +103,25 @@ function scoreBattleEngagement(sim: Simulation, config: SimConfig): MatchEngagem
   const fightSpan = battleFightSpan(stats);
 
   const stallPenalty =
-    stats.duration > 85 && stats.firstDeathTime > 50 ? 0.45 : stats.duration > 70 && fightSpan < 0.3 ? 0.62 : 1;
+    stats.duration > 58 && stats.firstDeathTime > 34
+      ? 0.45
+      : stats.duration > 50 && fightSpan < 0.3
+        ? 0.62
+        : 1;
   const timeoutPenalty = stats.hitTimeLimit ? 0.25 : 1;
 
   const action =
-    duration * 0.28 + firstAction * 0.24 + combatPace * 0.28 + fightSpan * 0.2;
+    duration * 0.34 + firstAction * 0.22 + combatPace * 0.24 + fightSpan * 0.2;
   const score = (action * 0.68 + closeness.score * 0.32) * stallPenalty * timeoutPenalty;
 
   let summary = "Lively match";
   if (stats.hitTimeLimit) summary = "Timed out";
-  else if (firstAction < 0.35 && stats.duration > 95) summary = "Slow start";
-  else if (combatPace < 0.35 && stats.duration > 80) summary = "Low action";
-  else if (fightSpan < 0.35 && stats.duration > 70) summary = "Late brawl";
-  else if (duration >= 0.85 && combatPace >= 0.55) summary = "Fast and scrappy";
+  else if (firstAction < 0.35 && stats.duration > 60) summary = "Slow start";
+  else if (combatPace < 0.35 && stats.duration > 55) summary = "Low action";
+  else if (fightSpan < 0.35 && stats.duration > 48) summary = "Late brawl";
+  else if (Math.abs(stats.duration - LIVELY_TARGET_SECONDS) <= 8 && combatPace >= 0.5) {
+    summary = "~40s scrap";
+  } else if (duration >= 0.85 && combatPace >= 0.55) summary = "Fast and scrappy";
   else if (closeness.score >= 0.62) summary = "Active close finish";
 
   return {
@@ -148,13 +168,15 @@ function scoreRaceEngagement(sim: Simulation, config: SimConfig): MatchEngagemen
   const fightSpan = clamp01(stats.finishTimes.length / Math.max(1, sim.cubes.length));
 
   const score =
-    (duration * 0.3 + firstAction * 0.22 + combatPace * 0.28 + fightSpan * 0.2) * 0.62 +
+    (duration * 0.36 + firstAction * 0.2 + combatPace * 0.26 + fightSpan * 0.18) * 0.62 +
     closeness.score * 0.38;
 
   let summary = "Pacy race";
   if (stats.hitTimeLimit) summary = "Timed out";
-  else if (firstAction < 0.4 && stats.duration > 90) summary = "Slow opener";
-  else if (combatPace >= 0.7) summary = "Tight pack sprint";
+  else if (firstAction < 0.4 && stats.duration > 65) summary = "Slow opener";
+  else if (Math.abs(stats.duration - LIVELY_TARGET_SECONDS) <= 8 && combatPace >= 0.55) {
+    summary = "~40s sprint";
+  } else if (combatPace >= 0.7) summary = "Tight pack sprint";
   else if (duration >= 0.85) summary = "Quick race";
 
   return {

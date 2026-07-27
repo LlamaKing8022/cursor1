@@ -533,7 +533,7 @@ ui.findSeed.addEventListener("click", () => {
 });
 
 ui.findLivelySeed.addEventListener("click", () => {
-  runSeedSearch("engagement", "Scanning seeds for early action and good pacing…");
+  runSeedSearch("engagement", "Scanning seeds for ~40s of action and a tight finish…");
 });
 
 ui.setupForm.addEventListener("submit", (event) => {

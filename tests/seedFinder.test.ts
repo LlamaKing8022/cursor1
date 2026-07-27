@@ -122,6 +122,15 @@ group("engagement finder returns a finished candidate", () => {
   check(result.best.summary.includes("s)"), "engagement summary includes duration");
 });
 
+group("engagement scoring favors matches near 40 seconds", () => {
+  const nearTarget = Math.exp(-0.5 * ((40 - 40) / 11) ** 2);
+  const tooLong = Math.exp(-0.5 * ((78 - 40) / 11) ** 2) * 0.68;
+  const wayTooLong = Math.exp(-0.5 * ((110 - 40) / 11) ** 2) * 0.12;
+
+  check(nearTarget > tooLong, "40s should beat 78s on duration score");
+  check(tooLong > wayTooLong, "78s should beat 110s on duration score");
+});
+
 group("engagement scoring penalizes late action and long stalls", () => {
   const { seed: _ignored, ...base } = baseConfig();
 
