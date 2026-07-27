@@ -36,7 +36,7 @@ export interface SeedFinderResult {
   scanned: number;
 }
 
-const DEFAULT_SCAN_COUNT = 180;
+const DEFAULT_SCAN_COUNT = 1500;
 const DEFAULT_REFINE_RADIUS = 6;
 const DEFAULT_TOP_K = 5;
 

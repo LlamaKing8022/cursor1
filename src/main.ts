@@ -507,7 +507,7 @@ function runSeedSearch(scoring: SeedScoring, busyMessage: string): void {
     try {
       const result = await search(base, {
         startSeed,
-        scanCount: scoring === "engagement" ? 160 : 140,
+        scanCount: 1500,
         refineRadius: scoring === "engagement" ? 6 : 5,
         yieldEvery: 10,
         onProgress: (done, total, best) => {
