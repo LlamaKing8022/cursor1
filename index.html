@@ -166,7 +166,15 @@
 
         <div class="field">
           <label for="input-seed">Seed <small>(blank for random)</small></label>
-          <input id="input-seed" name="seed" type="text" inputmode="numeric" placeholder="random" />
+          <div class="seed-row">
+            <input id="input-seed" name="seed" type="text" inputmode="numeric" placeholder="random" />
+            <button type="button" class="btn" id="btn-find-seed">Find close seed</button>
+          </div>
+          <p class="seed-status" id="seed-status" hidden></p>
+          <label class="checkbox seed-preference">
+            <input type="checkbox" id="input-close-seeds" name="close-seeds" />
+            <span>Prefer close seeds for new matches</span>
+          </label>
         </div>
 
         <div class="modal-actions">

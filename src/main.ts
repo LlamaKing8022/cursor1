@@ -10,6 +10,7 @@ import { SoundEngine } from "./audio/sounds";
 import { teamColor, teamName } from "./sim/teams";
 import { MapEditor } from "./editor/editor";
 import { findMap, loadMaps } from "./editor/storage";
+import { findCloseSeeds } from "./sim/seedFinder";
 import type { CustomMap } from "./sim/map";
 import type { ArenaStyle, Cube, GameMode, SimConfig } from "./sim/types";
 
@@ -67,6 +68,9 @@ const ui = {
   arenaHeightOut: required<HTMLOutputElement>("out-arena-height"),
   arenaHeightField: required<HTMLDivElement>("field-arena-height"),
   seedInput: required<HTMLInputElement>("input-seed"),
+  findSeed: required<HTMLButtonElement>("btn-find-seed"),
+  seedStatus: required<HTMLParagraphElement>("seed-status"),
+  closeSeeds: required<HTMLInputElement>("input-close-seeds"),
 };
 
 let config: SimConfig = {
@@ -90,6 +94,8 @@ let timeScale = 1;
 let accumulator = 0;
 let lastFrame = performance.now();
 let resultShown = false;
+let preferCloseSeeds = false;
+let seedSearchToken = 0;
 
 function startMatch(next: SimConfig): void {
   config = next;
@@ -317,8 +323,12 @@ function setTimeScale(next: number): void {
 
 ui.play.addEventListener("click", () => setRunning(!running));
 ui.rerun.addEventListener("click", () => startMatch({ ...config }));
-ui.newMatch.addEventListener("click", () => startMatch({ ...config, seed: randomSeed() }));
-ui.again.addEventListener("click", () => startMatch({ ...config, seed: randomSeed() }));
+ui.newMatch.addEventListener("click", () => {
+  void startMatchWithFreshSeed();
+});
+ui.again.addEventListener("click", () => {
+  void startMatchWithFreshSeed();
+});
 
 for (const button of document.querySelectorAll<HTMLButtonElement>(".btn-speed")) {
   button.addEventListener("click", () => setTimeScale(Number(button.dataset.speed)));
@@ -385,12 +395,58 @@ function syncSetupForm(): void {
   ui.collisionDamage.checked = config.collisionDamage;
   ui.arenaHeight.value = String(config.arenaHeight);
   ui.seedInput.value = "";
+  ui.closeSeeds.checked = preferCloseSeeds;
+  ui.seedStatus.hidden = true;
+  ui.seedStatus.textContent = "";
+  ui.seedStatus.classList.remove("is-busy");
   refreshSetupOutputs();
 }
 
 function selectedMode(): GameMode {
   const checked = ui.setupForm.querySelector<HTMLInputElement>('input[name="mode"]:checked');
   return checked?.value === "race" ? "race" : "battle";
+}
+
+function configFromSetupForm(): Omit<SimConfig, "seed"> {
+  const arenaValue = ui.arena.value;
+  const customMap = arenaValue.startsWith("custom:") ? findMap(arenaValue.slice(7)) : null;
+
+  return {
+    mode: selectedMode(),
+    cubeCount: Number(ui.count.value),
+    speed: Number(ui.speed.value),
+    arenaStyle: customMap ? config.arenaStyle : (arenaValue as ArenaStyle),
+    powerUpsEnabled: ui.powerUps.checked,
+    startingHp: Number(ui.hp.value),
+    teamMode: ui.teams.checked,
+    teamCount: Number(ui.teamCount.value),
+    collisionDamage: ui.collisionDamage.checked,
+    arenaHeight: Number(ui.arenaHeight.value),
+    customMap: customMap ?? null,
+  };
+}
+
+function seedFromInput(raw: string): number {
+  if (raw === "") return randomSeed();
+  return /^\d+$/.test(raw) ? Number(raw) >>> 0 : seedFromString(raw);
+}
+
+async function startMatchWithFreshSeed(useCloseSeeds = preferCloseSeeds): Promise<void> {
+  if (!useCloseSeeds) {
+    startMatch({ ...config, seed: randomSeed() });
+    return;
+  }
+
+  ui.banner.hidden = false;
+  ui.bannerText.textContent = "Finding a close seed…";
+  const { best } = await findCloseSeeds(config, {
+    scanCount: 72,
+    refineRadius: 4,
+    topK: 1,
+    yieldEvery: 8,
+  });
+  ui.banner.hidden = true;
+  startMatch({ ...config, seed: best.seed });
 }
 
 function refreshSetupOutputs(): void {
@@ -425,31 +481,71 @@ ui.cancel.addEventListener("click", () => {
 ui.setupForm.addEventListener("input", refreshSetupOutputs);
 ui.arena.addEventListener("change", refreshSetupOutputs);
 ui.teams.addEventListener("change", refreshSetupOutputs);
+ui.closeSeeds.addEventListener("change", () => {
+  preferCloseSeeds = ui.closeSeeds.checked;
+});
+
+ui.findSeed.addEventListener("click", () => {
+  void (async () => {
+    const token = ++seedSearchToken;
+    ui.findSeed.disabled = true;
+    ui.seedStatus.hidden = false;
+    ui.seedStatus.classList.add("is-busy");
+    ui.seedStatus.textContent = "Scanning seeds for a tight match…";
+
+    const base = configFromSetupForm();
+    const startSeed = seedFromInput(ui.seedInput.value.trim());
+
+    try {
+      const result = await findCloseSeeds(base, {
+        startSeed,
+        scanCount: 140,
+        refineRadius: 5,
+        yieldEvery: 10,
+        onProgress: (done, total, best) => {
+          if (token !== seedSearchToken) return;
+          const pct = Math.round((done / total) * 100);
+          ui.seedStatus.textContent = best
+            ? `Scanning… ${pct}% · best so far: ${best.seed} (${Math.round(best.score * 100)}%)`
+            : `Scanning… ${pct}%`;
+        },
+      });
+      if (token !== seedSearchToken) return;
+      ui.seedInput.value = String(result.best.seed);
+      ui.seedStatus.classList.remove("is-busy");
+      ui.seedStatus.textContent = `Found ${result.best.summary} after ${result.scanned} tries.`;
+    } finally {
+      if (token === seedSearchToken) ui.findSeed.disabled = false;
+    }
+  })();
+});
 
 ui.setupForm.addEventListener("submit", (event) => {
   event.preventDefault();
+  const base = configFromSetupForm();
   const raw = ui.seedInput.value.trim();
-  const seed = raw === "" ? randomSeed() : /^\d+$/.test(raw) ? Number(raw) >>> 0 : seedFromString(raw);
-
-  const arenaValue = ui.arena.value;
-  const customMap = arenaValue.startsWith("custom:") ? findMap(arenaValue.slice(7)) : null;
 
   closeSetup();
-  startMatch({
-    mode: selectedMode(),
-    cubeCount: Number(ui.count.value),
-    seed,
-    speed: Number(ui.speed.value),
-    // A custom map supplies its own layout, so keep the last generated style.
-    arenaStyle: customMap ? config.arenaStyle : (arenaValue as ArenaStyle),
-    powerUpsEnabled: ui.powerUps.checked,
-    startingHp: Number(ui.hp.value),
-    teamMode: ui.teams.checked,
-    teamCount: Number(ui.teamCount.value),
-    collisionDamage: ui.collisionDamage.checked,
-    arenaHeight: Number(ui.arenaHeight.value),
-    customMap,
-  });
+
+  void (async () => {
+    let seed: number;
+    if (raw === "" && preferCloseSeeds) {
+      ui.banner.hidden = false;
+      ui.bannerText.textContent = "Finding a close seed…";
+      const result = await findCloseSeeds(base, {
+        scanCount: 100,
+        refineRadius: 4,
+        topK: 1,
+        yieldEvery: 8,
+      });
+      ui.banner.hidden = true;
+      seed = result.best.seed;
+    } else {
+      seed = seedFromInput(raw);
+    }
+
+    startMatch({ ...base, seed });
+  })();
 });
 
 ui.setup.addEventListener("click", (event) => {
@@ -489,7 +585,7 @@ window.addEventListener("keydown", (event) => {
     event.preventDefault();
     setRunning(!running);
   } else if (event.key === "r") {
-    startMatch({ ...config, seed: randomSeed() });
+    void startMatchWithFreshSeed();
   }
 });
 
