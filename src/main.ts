@@ -227,7 +227,7 @@ function buildRow(cube: Cube, index: number): HTMLLIElement {
     meta.textContent = cube.alive ? `${Math.ceil(cube.hp)} hp · ${kos}` : `out · ${kos}`;
     if (gun) appendGunCarrying(meta, gun.kind);
     fill.style.width = `${Math.max(0, ratio) * 100}%`;
-    fill.style.background = ratio > 0.5 ? "var(--good)" : ratio > 0.25 ? "#ffd166" : "var(--danger)";
+    fill.style.background = ratio > 0.5 ? "var(--good)" : ratio > 0.25 ? "#ffeb3b" : "var(--danger)";
   } else {
     const progress = sim.finishX ? Math.min(1, cube.x / sim.finishX) : 0;
     const gun = sim.gunHeldBy(cube.id);

@@ -1,6 +1,6 @@
 export const TEAM_NAMES = ["Blue", "Red", "Green", "Gold"] as const;
 
-export const TEAM_COLORS = ["#4dabff", "#ff4d6d", "#4dffa3", "#ffd166"] as const;
+export const TEAM_COLORS = ["#2196f3", "#f44336", "#4caf50", "#ffeb3b"] as const;
 
 /** How many teams to field for a given roster size. */
 export function teamCountFor(cubeCount: number): number {

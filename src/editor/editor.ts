@@ -574,16 +574,14 @@ export class MapEditor {
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = theme.backdropBottom;
+    ctx.fillStyle = theme.checkerDark;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.setTransform(scale, 0, 0, scale, -this.scrollX * scale, 0);
 
-    const floor = ctx.createLinearGradient(0, 0, this.draft.width * 0.35, this.draft.height);
-    floor.addColorStop(0, theme.floorTop);
-    floor.addColorStop(1, theme.floorBottom);
-    ctx.fillStyle = floor;
+    ctx.fillStyle = theme.floor;
     ctx.fillRect(0, 0, this.draft.width, this.draft.height);
+    this.drawFloorSpeckles(theme);
 
     this.drawGrid();
     this.drawFinishZone();
@@ -594,14 +592,29 @@ export class MapEditor {
     this.drawDragPreview();
 
     ctx.strokeStyle = theme.border;
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 4;
     ctx.strokeRect(0, 0, this.draft.width, this.draft.height);
+  }
+
+  private drawFloorSpeckles(theme: ReturnType<typeof themeFor>): void {
+    const { ctx } = this;
+    const step = 26;
+    ctx.fillStyle = theme.floorSpeckle;
+
+    for (let x = step / 2; x < this.draft.width; x += step) {
+      for (let y = step / 2; y < this.draft.height; y += step) {
+        const cell = Math.floor(x / step) + Math.floor(y / step);
+        if (cell % 3 !== 0) continue;
+        ctx.fillRect(x, y, 2, 2);
+      }
+    }
   }
 
   private drawGrid(): void {
     const { ctx } = this;
+    const theme = themeFor(this.draft.palette);
 
-    ctx.strokeStyle = "rgba(150, 175, 255, 0.09)";
+    ctx.strokeStyle = theme.grid;
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let x = GRID; x < this.draft.width; x += GRID) {
@@ -614,7 +627,7 @@ export class MapEditor {
     }
     ctx.stroke();
 
-    ctx.strokeStyle = "rgba(150, 175, 255, 0.2)";
+    ctx.strokeStyle = "rgba(142, 61, 135, 0.22)";
     ctx.beginPath();
     for (let x = 100; x < this.draft.width; x += 100) {
       ctx.moveTo(x, 0);
@@ -629,43 +642,46 @@ export class MapEditor {
 
   private drawFinishZone(): void {
     const { ctx } = this;
+    const theme = themeFor(this.draft.palette);
     const finishX = mapFinishX(this.draft);
+    const goalWidth = 34;
+    const goalX = finishX - goalWidth;
 
-    ctx.save();
-    ctx.setLineDash([10, 8]);
-    ctx.strokeStyle = "rgba(244, 247, 255, 0.5)";
-    ctx.lineWidth = 2;
+    const gradient = ctx.createRadialGradient(
+      goalX + goalWidth / 2,
+      this.draft.height / 2,
+      12,
+      goalX + goalWidth / 2,
+      this.draft.height / 2,
+      this.draft.height / 2,
+    );
+    gradient.addColorStop(0, theme.goalInner);
+    gradient.addColorStop(1, theme.goalOuter);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(goalX, 0, goalWidth, this.draft.height);
+
+    ctx.strokeStyle = theme.border;
+    ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(finishX, 0);
     ctx.lineTo(finishX, this.draft.height);
     ctx.stroke();
-    ctx.restore();
-
-    ctx.save();
-    ctx.translate(finishX - 8, this.draft.height / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.fillStyle = "rgba(244, 247, 255, 0.55)";
-    ctx.font = "600 15px ui-sans-serif, system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "bottom";
-    ctx.fillText("RACE FINISH", 0, 0);
-    ctx.restore();
   }
 
   private drawSpawnZones(): void {
     const { ctx } = this;
     for (const zone of this.draft.spawnZones) {
-      ctx.fillStyle = "rgba(77, 255, 163, 0.13)";
+      ctx.fillStyle = "rgba(76, 175, 80, 0.18)";
       ctx.fillRect(zone.x, zone.y, zone.width, zone.height);
 
       ctx.save();
       ctx.setLineDash([9, 6]);
-      ctx.strokeStyle = "rgba(77, 255, 163, 0.85)";
+      ctx.strokeStyle = "rgba(46, 125, 50, 0.9)";
       ctx.lineWidth = 2;
       ctx.strokeRect(zone.x, zone.y, zone.width, zone.height);
       ctx.restore();
 
-      ctx.fillStyle = "rgba(77, 255, 163, 0.95)";
+      ctx.fillStyle = "rgba(46, 125, 50, 0.95)";
       ctx.font = "700 14px ui-sans-serif, system-ui, sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "top";

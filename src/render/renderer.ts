@@ -25,10 +25,10 @@ const POWERUP_GLYPHS = {
 } as const;
 
 const POWERUP_COLORS = {
-  heal: "#4dffa3",
-  rage: "#ff4d6d",
-  speed: "#ffd166",
-  shield: "#4dabff",
+  heal: "#4caf50",
+  rage: "#f44336",
+  speed: "#ffeb3b",
+  shield: "#2196f3",
 } as const;
 
 export class Renderer {
@@ -103,11 +103,15 @@ export class Renderer {
   }
 
   private paintBackdrop(width: number, height: number): void {
-    const gradient = this.ctx.createLinearGradient(0, 0, 0, height);
-    gradient.addColorStop(0, this.theme.backdropTop);
-    gradient.addColorStop(1, this.theme.backdropBottom);
-    this.ctx.fillStyle = gradient;
-    this.ctx.fillRect(0, 0, width, height);
+    const { ctx } = this;
+    const tile = 24;
+    for (let y = 0; y < height; y += tile) {
+      for (let x = 0; x < width; x += tile) {
+        const even = (Math.floor(x / tile) + Math.floor(y / tile)) % 2 === 0;
+        ctx.fillStyle = even ? this.theme.checkerDark : this.theme.checkerLight;
+        ctx.fillRect(x, y, tile, tile);
+      }
+    }
   }
 
   private computeCamera(
@@ -153,85 +157,59 @@ export class Renderer {
   private drawFloor(world: Rect, active: Rect): void {
     const { ctx } = this;
 
-    const gradient = ctx.createLinearGradient(0, 0, world.width * 0.35, world.height);
-    gradient.addColorStop(0, this.theme.floorTop);
-    gradient.addColorStop(1, this.theme.floorBottom);
-    ctx.fillStyle = gradient;
+    ctx.fillStyle = this.theme.floor;
     ctx.fillRect(world.x, world.y, world.width, world.height);
+    this.drawFloorSpeckles(world);
 
     if (this.mode === "battle" && active.width < world.width) {
       // Tint the ground the storm has already claimed.
-      ctx.fillStyle = "rgba(255, 77, 109, 0.16)";
+      ctx.fillStyle = "rgba(122, 52, 116, 0.28)";
       ctx.fillRect(world.x, world.y, world.width, world.height);
-      ctx.fillStyle = gradient;
+      ctx.fillStyle = this.theme.floor;
       ctx.fillRect(active.x, active.y, active.width, active.height);
+      this.drawFloorSpeckles(active);
+    }
+  }
+
+  private drawFloorSpeckles(area: Rect): void {
+    const { ctx } = this;
+    const step = 26;
+    ctx.fillStyle = this.theme.floorSpeckle;
+
+    for (let x = area.x + step / 2; x < area.x + area.width; x += step) {
+      for (let y = area.y + step / 2; y < area.y + area.height; y += step) {
+        const cell = Math.floor(x / step) + Math.floor(y / step);
+        if (cell % 3 !== 0) continue;
+        ctx.fillRect(x, y, 2, 2);
+      }
     }
   }
 
   /** Purely cosmetic shapes that give each map some colour of its own. */
   private drawDecor(world: Rect): void {
     const { ctx } = this;
-    const accent = this.theme.accent;
 
     if (this.mode === "battle") {
-      const cx = world.width / 2;
-      const cy = world.height / 2;
-
-      ctx.strokeStyle = accent;
-      for (const [radius, alpha] of [
-        [world.height * 0.42, 0.07],
-        [world.height * 0.28, 0.1],
-        [world.height * 0.14, 0.13],
-      ] as const) {
-        ctx.globalAlpha = alpha;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      // Corner wedges to break up the empty edges of the floor.
-      ctx.fillStyle = accent;
-      ctx.globalAlpha = 0.06;
-      const wedge = Math.min(world.width, world.height) * 0.22;
-      for (const [sx, sy] of [
-        [0, 0],
-        [1, 0],
-        [0, 1],
-        [1, 1],
-      ] as const) {
-        const px = sx === 0 ? world.x : world.x + world.width;
-        const py = sy === 0 ? world.y : world.y + world.height;
-        ctx.beginPath();
-        ctx.moveTo(px, py);
-        ctx.lineTo(px + (sx === 0 ? wedge : -wedge), py);
-        ctx.lineTo(px, py + (sy === 0 ? wedge : -wedge));
-        ctx.closePath();
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
       return;
     }
 
-    // Race: banded lanes plus accent stripes so speed is easy to read.
+    // Race: soft lane bands and distance ticks in the accent colour.
+    const accent = this.theme.accent;
     const bandHeight = world.height / 6;
     ctx.fillStyle = accent;
     for (let i = 0; i < 6; i += 1) {
-      ctx.globalAlpha = i % 2 === 0 ? 0.045 : 0.015;
+      ctx.globalAlpha = i % 2 === 0 ? 0.08 : 0.03;
       ctx.fillRect(world.x, world.y + i * bandHeight, world.width, bandHeight);
     }
 
-    // Distance markers hug the top and bottom edges: a full-height stripe here
-    // would read as a wall and make it unclear what the cubes can pass through.
     const tick = 20;
-    ctx.globalAlpha = 0.5;
+    ctx.globalAlpha = 0.45;
     for (let x = 400; x < world.width - 100; x += 400) {
       ctx.fillRect(x, world.y, 7, tick);
       ctx.fillRect(x, world.y + world.height - tick, 7, tick);
     }
 
-    // Start pad.
-    ctx.globalAlpha = 0.12;
+    ctx.globalAlpha = 0.14;
     ctx.fillRect(world.x, world.y, 110, world.height);
     ctx.globalAlpha = 1;
   }
@@ -257,29 +235,45 @@ export class Renderer {
     const { ctx } = this;
 
     if (this.mode === "battle" && active.width < world.width) {
-      ctx.strokeStyle = "rgba(255, 77, 109, 0.85)";
+      ctx.strokeStyle = "rgba(122, 52, 116, 0.9)";
       ctx.lineWidth = 3;
       ctx.strokeRect(active.x, active.y, active.width, active.height);
     }
 
     ctx.strokeStyle = this.theme.border;
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 4;
     ctx.strokeRect(world.x, world.y, world.width, world.height);
   }
 
   private drawFinishLine(finishX: number, world: Rect): void {
     const { ctx } = this;
     const squareSize = 16;
+    const goalWidth = 34;
+    const goalX = finishX - goalWidth;
 
     for (let y = 0; y < world.height; y += squareSize) {
       const row = Math.floor(y / squareSize);
-      for (let i = 0; i < 2; i += 1) {
-        ctx.fillStyle = (row + i) % 2 === 0 ? "#f4f7ff" : "#141d2c";
-        ctx.fillRect(finishX + i * squareSize, y, squareSize, squareSize);
+      for (let x = goalX - squareSize * 2; x < finishX + squareSize; x += squareSize) {
+        if (x >= goalX) continue;
+        ctx.fillStyle = (row + Math.floor(x / squareSize)) % 2 === 0 ? "#f4f7ff" : "#1a237e";
+        ctx.fillRect(x, y, squareSize, squareSize);
       }
     }
 
-    ctx.strokeStyle = this.theme.accent;
+    const gradient = ctx.createRadialGradient(
+      goalX + goalWidth / 2,
+      world.height / 2,
+      12,
+      goalX + goalWidth / 2,
+      world.height / 2,
+      world.height / 2,
+    );
+    gradient.addColorStop(0, this.theme.goalInner);
+    gradient.addColorStop(1, this.theme.goalOuter);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(goalX, 0, goalWidth, world.height);
+
+    ctx.strokeStyle = this.theme.border;
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(finishX, 0);
@@ -459,7 +453,7 @@ export class Renderer {
     const top = cube.y - cube.half;
 
     if (!cube.alive) {
-      ctx.globalAlpha = 0.16;
+      ctx.globalAlpha = 0.22;
       ctx.fillStyle = cube.color;
       ctx.fillRect(left, top, size, size);
       ctx.globalAlpha = 1;
@@ -468,6 +462,9 @@ export class Renderer {
 
     ctx.fillStyle = cube.flash > 0 ? "#ffffff" : cube.color;
     ctx.fillRect(left, top, size, size);
+    ctx.strokeStyle = "#1a1a1a";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(left, top, size, size);
 
     if (cube.rageTime > 0) {
       ctx.strokeStyle = "#ff4d6d";
@@ -495,9 +492,9 @@ export class Renderer {
     const y = cube.y - cube.half - 14;
     const ratio = cube.hp / cube.maxHp;
 
-    ctx.fillStyle = "rgba(6, 10, 20, 0.85)";
+    ctx.fillStyle = "#1a237e";
     ctx.fillRect(x - 1, y - 1, width + 2, height + 2);
-    ctx.fillStyle = ratio > 0.5 ? "#4dffa3" : ratio > 0.25 ? "#ffd166" : "#ff4d6d";
+    ctx.fillStyle = ratio > 0.5 ? "#4caf50" : ratio > 0.25 ? "#ffeb3b" : "#f44336";
     ctx.fillRect(x, y, width * ratio, height);
   }
 }
