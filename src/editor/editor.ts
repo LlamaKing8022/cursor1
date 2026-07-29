@@ -472,10 +472,10 @@ export class MapEditor {
           this.tool === "breakable-wall" ? Number(this.ui.wallHits.value) : undefined,
       };
       this.draft.walls.push(wall);
-      const kind = this.tool === "breakable-wall" ? "Breakable wall" : "Wall";
-      this.setStatus(
-        direction === "none" ? `${kind} added` : `${kind} added (${direction})`,
-      );
+      const noun = this.tool === "breakable-wall" ? "breakable wall" : "wall";
+      const phrase =
+        direction === "none" ? `${noun} added` : `moving ${noun} added (${direction})`;
+      this.setStatus(phrase[0].toUpperCase() + phrase.slice(1));
     } else {
       this.draft.spawnZones.push(clamped);
       this.setStatus("Spawn zone added");

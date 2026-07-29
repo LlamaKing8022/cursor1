@@ -65,9 +65,6 @@ const ui = {
   teamCount: required<HTMLInputElement>("input-team-count"),
   teamCountOut: required<HTMLOutputElement>("out-team-count"),
   teamCountField: required<HTMLDivElement>("field-team-count"),
-  arenaHeight: required<HTMLInputElement>("input-arena-height"),
-  arenaHeightOut: required<HTMLOutputElement>("out-arena-height"),
-  arenaHeightField: required<HTMLDivElement>("field-arena-height"),
   seedInput: required<HTMLInputElement>("input-seed"),
   findSeed: required<HTMLButtonElement>("btn-find-seed"),
   findLivelySeed: required<HTMLButtonElement>("btn-find-lively-seed"),
@@ -354,9 +351,9 @@ function openSetup(): void {
 }
 
 const BUILT_IN_ARENAS: Array<[ArenaStyle, string]> = [
-  ["pillars", "Pillars — a few obstacles"],
-  ["open", "Open — wide and empty"],
-  ["maze", "Maze — tight and chaotic"],
+  ["pillars", "Pillars (a few obstacles)"],
+  ["open", "Open (wide and empty)"],
+  ["maze", "Maze (tight and chaotic)"],
 ];
 
 /** Rebuilds the arena dropdown so newly saved custom maps show up. */
@@ -403,7 +400,6 @@ function syncSetupForm(): void {
   ui.teams.checked = config.teamMode;
   ui.teamCount.value = String(config.teamCount);
   ui.collisionDamage.checked = config.collisionDamage;
-  ui.arenaHeight.value = String(config.arenaHeight);
   ui.seedInput.value = "";
   ui.closeSeeds.checked = preferCloseSeeds;
   ui.seedStatus.hidden = true;
@@ -431,7 +427,7 @@ function configFromSetupForm(): Omit<SimConfig, "seed"> {
     teamMode: ui.teams.checked,
     teamCount: Number(ui.teamCount.value),
     collisionDamage: ui.collisionDamage.checked,
-    arenaHeight: Number(ui.arenaHeight.value),
+    arenaHeight: DEFAULT_ARENA_HEIGHT,
     customMap: customMap ?? null,
   };
 }
@@ -464,14 +460,11 @@ function refreshSetupOutputs(): void {
   ui.speedOut.textContent = `${Number(ui.speed.value).toFixed(1)}x`;
   ui.hpOut.textContent = ui.hp.value;
   ui.teamCountOut.textContent = ui.teamCount.value;
-  ui.arenaHeightOut.textContent = ui.arenaHeight.value;
 
   const battle = selectedMode() === "battle";
-  const customMap = ui.arena.value.startsWith("custom:");
   ui.hpField.hidden = !battle;
   ui.battleOptions.hidden = !battle;
   ui.teamCountField.hidden = !battle || !ui.teams.checked;
-  ui.arenaHeightField.hidden = customMap;
 
   const maxTeams = Math.min(4, Number(ui.count.value));
   ui.teamCount.max = String(maxTeams);

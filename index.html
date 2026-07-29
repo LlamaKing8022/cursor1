@@ -42,8 +42,10 @@
             <button class="btn btn-speed" data-speed="2" type="button">2x</button>
             <button class="btn btn-speed" data-speed="4" type="button">4x</button>
           </div>
+          <span class="control-sep"></span>
           <button id="btn-rerun" class="btn" type="button">Rerun</button>
           <button id="btn-new" class="btn" type="button">New match</button>
+          <span class="control-sep"></span>
           <button id="btn-setup" class="btn" type="button">Setup</button>
           <button id="btn-editor" class="btn" type="button">Map editor</button>
         </div>
@@ -122,23 +124,10 @@
         <div class="field">
           <label for="input-arena">Arena</label>
           <select id="input-arena" name="arena">
-            <option value="pillars" selected>Pillars — a few obstacles</option>
-            <option value="open">Open — wide and empty</option>
-            <option value="maze">Maze — tight and chaotic</option>
+            <option value="pillars" selected>Pillars (a few obstacles)</option>
+            <option value="open">Open (wide and empty)</option>
+            <option value="maze">Maze (tight and chaotic)</option>
           </select>
-        </div>
-
-        <div class="field" id="field-arena-height">
-          <label for="input-arena-height">Arena height <output id="out-arena-height">640</output></label>
-          <input
-            id="input-arena-height"
-            name="arena-height"
-            type="range"
-            min="640"
-            max="1200"
-            step="40"
-            value="640"
-          />
         </div>
 
         <div class="field field-row" id="field-battle-options">
@@ -248,10 +237,10 @@
             <div class="field">
               <label for="editor-gun">Gun type</label>
               <select id="editor-gun">
-                <option value="pistol" selected>Pistol — steady</option>
-                <option value="smg">SMG — fast, weak</option>
-                <option value="shotgun">Shotgun — spread</option>
-                <option value="sniper">Sniper — heavy</option>
+                <option value="pistol" selected>Pistol (steady)</option>
+                <option value="smg">SMG (fast, weak)</option>
+                <option value="shotgun">Shotgun (spread)</option>
+                <option value="sniper">Sniper (heavy)</option>
               </select>
             </div>
 
