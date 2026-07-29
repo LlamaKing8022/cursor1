@@ -37,16 +37,6 @@ const STORM_CHIP_GRACE = 28;
 const STORM_SPEED = 18;
 const STORM_CHIP_DPS = 2.5;
 
-/**
- * Race tracks are long, so cubes need a push down the track. Two limits keep
- * that push from taking over the physics: it never claims more than a share of
- * a cube's speed (uncapped it flattens every racer onto a dead-straight line),
- * and it fades out over the last stretch so the run in to the flag is decided
- * by ordinary bouncing rather than by cubes being shoved into the end wall.
- */
-const RACE_DRIFT_ACCEL = 620;
-const RACE_MAX_DRIFT_SHARE = 0.72;
-const RACE_DRIFT_TAPER = 620;
 const RACE_FINISH_MARGIN = 70;
 const RACE_PODIUM_GRACE = 2.5;
 const HARD_TIME_LIMIT = 180;
@@ -64,8 +54,6 @@ export class Simulation {
   readonly obstacles: Obstacle[];
   readonly finishX: number | null;
   readonly finishZones: Rect[];
-  /** Nearest x a racer has to reach, from either a placed flag or the line. */
-  readonly raceTargetX: number | null;
 
   cubes: Cube[] = [];
   powerUps: PowerUp[] = [];
@@ -118,12 +106,6 @@ export class Simulation {
     this.finishZones = this.customMap?.finishZones.map((zone) => ({ ...zone })) ?? [];
     this.finishX =
       config.mode === "race" && !this.customMap ? this.bounds.width - RACE_FINISH_MARGIN : null;
-    this.raceTargetX =
-      config.mode !== "race"
-        ? null
-        : this.finishZones.length > 0
-          ? Math.min(...this.finishZones.map((zone) => zone.x))
-          : this.finishX;
     this.stormDelay = STORM_BASE_DELAY + config.cubeCount;
     this.stormChipDelay = this.stormDelay + STORM_CHIP_GRACE;
     this.spawnCubes();
@@ -166,7 +148,7 @@ export class Simulation {
     for (const cube of this.cubes) {
       if (!cube.alive) continue;
       const finishedRacer = cube.place > 0;
-      this.integrate(cube, dt, finishedRacer);
+      this.integrate(cube, dt);
       this.collideWithBounds(cube);
       this.collideWithObstacles(cube);
       // Moving walls can shove a cube past the edge, so clamp once more.
@@ -321,12 +303,7 @@ export class Simulation {
     };
   }
 
-  private integrate(cube: Cube, dt: number, finishedRacer = false): void {
-    // Finished racers coast; only cubes still racing get the drift.
-    if (this.config.mode === "race" && !finishedRacer) {
-      this.applyRaceDrift(cube, dt);
-    }
-
+  private integrate(cube: Cube, dt: number): void {
     const previousX = cube.x;
     const previousY = cube.y;
     cube.x += cube.vx * dt;
@@ -334,22 +311,6 @@ export class Simulation {
     cube.distanceTravelled += Math.hypot(cube.x - previousX, cube.y - previousY);
 
     this.regulateSpeed(cube, dt);
-  }
-
-  /** Carries racers down the track, easing off as they approach the finish. */
-  private applyRaceDrift(cube: Cube, dt: number): void {
-    if (this.raceTargetX === null) return;
-
-    const remaining = this.raceTargetX - cube.x;
-    if (remaining <= 0) return;
-
-    const closing = Math.min(1, remaining / RACE_DRIFT_TAPER);
-    const urgency = 1 + Math.max(0, this.time - 45) * 0.05;
-    const share = Math.min(RACE_MAX_DRIFT_SHARE * urgency, 1) * closing;
-    const cap = BASE_SPEED * this.config.speed * share;
-    if (cube.vx >= cap) return;
-
-    cube.vx = Math.min(cap, cube.vx + RACE_DRIFT_ACCEL * urgency * closing * dt);
   }
 
   /**
