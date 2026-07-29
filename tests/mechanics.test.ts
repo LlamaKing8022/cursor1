@@ -718,6 +718,46 @@ group("placed finish zones are preserved through validation", () => {
   check((cleaned?.finishZones[0].width ?? 0) >= 32, "finish zone width is usable");
 });
 
+group("finished racers coast through the flag", () => {
+  const map = createEmptyMap();
+  map.width = 800;
+  const finishZone = { x: 600, y: 80, width: 48, height: 200 };
+  map.finishZones = [finishZone];
+  map.spawnZones = [{ x: 40, y: 80, width: 120, height: 200 }];
+
+  const sim = new Simulation(configFor(map, "race", { cubeCount: 2, powerUpsEnabled: false }));
+  const cube = sim.cubes[0];
+  const straggler = sim.cubes[1];
+  straggler.x = 80;
+  straggler.y = 200;
+  straggler.vx = 0;
+  straggler.vy = 0;
+
+  cube.x = finishZone.x - 20;
+  cube.y = finishZone.y + finishZone.height / 2;
+  cube.vx = 400;
+  cube.vy = 0;
+
+  for (let i = 0; i < 200 && cube.place === 0; i += 1) {
+    straggler.vx = 0;
+    straggler.vy = 0;
+    sim.step(FIXED_STEP);
+  }
+
+  check(cube.place === 1, "cube crossed the finish zone");
+  check(sim.status === "running", "match keeps running during podium grace");
+
+  const before = cube.x;
+  for (let i = 0; i < 30; i += 1) {
+    straggler.vx = 0;
+    straggler.vy = 0;
+    sim.step(FIXED_STEP);
+  }
+
+  check(cube.x > before, "finished cube kept moving past the flag");
+  check(cube.x > finishZone.x + finishZone.width, "finished cube cleared the flag zone");
+});
+
 console.log(`\n${checks - failures}/${checks} checks passed`);
 if (failures > 0) {
   console.error(`${failures} check(s) failed`);

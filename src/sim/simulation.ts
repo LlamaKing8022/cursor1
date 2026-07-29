@@ -149,13 +149,14 @@ export class Simulation {
     this.updateObstacles(dt);
 
     for (const cube of this.cubes) {
-      if (!cube.alive || cube.place > 0) continue;
-      this.integrate(cube, dt);
+      if (!cube.alive) continue;
+      const finishedRacer = cube.place > 0;
+      this.integrate(cube, dt, finishedRacer);
       this.collideWithBounds(cube);
       this.collideWithObstacles(cube);
       // Moving walls can shove a cube past the edge, so clamp once more.
       this.collideWithBounds(cube);
-      this.checkCrush(cube);
+      if (!finishedRacer) this.checkCrush(cube);
     }
 
     this.resolveCubeCollisions();
@@ -305,8 +306,9 @@ export class Simulation {
     };
   }
 
-  private integrate(cube: Cube, dt: number): void {
-    if (this.config.mode === "race") {
+  private integrate(cube: Cube, dt: number, finishedRacer = false): void {
+    // Finished racers coast through the flag; only active racers get the forward pull.
+    if (this.config.mode === "race" && !finishedRacer) {
       const urgency = 1 + Math.max(0, this.time - 45) * 0.05;
       cube.vx += RACE_FORWARD_ACCEL * urgency * dt;
     }
