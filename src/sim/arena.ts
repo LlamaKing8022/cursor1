@@ -66,7 +66,7 @@ export function createObstacles(
 }
 
 function solidObstacle(rect: Rect): Obstacle {
-  return { ...rect, vx: 0, vy: 0, breakable: false, hitsToBreak: 0, hitsRemaining: 0, hitCooldown: 0 };
+  return { ...rect, vx: 0, vy: 0, breakable: false, hitsToBreak: 0, hitsRemaining: 0 };
 }
 
 function toObstacle(wall: MapWall): Obstacle {
@@ -83,7 +83,6 @@ function toObstacle(wall: MapWall): Obstacle {
     breakable,
     hitsToBreak,
     hitsRemaining: hitsToBreak,
-    hitCooldown: 0,
   };
 }
 

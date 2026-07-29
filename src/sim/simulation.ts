@@ -42,8 +42,7 @@ const RACE_FORWARD_ACCEL = 620;
 const RACE_FINISH_MARGIN = 70;
 const RACE_PODIUM_GRACE = 2.5;
 const HARD_TIME_LIMIT = 180;
-const BREAKABLE_WALL_HIT_SPEED = 55;
-const BREAKABLE_WALL_HIT_COOLDOWN = 0.3;
+const BREAKABLE_WALL_HIT_SPEED = 40;
 const CRUSH_CLEARANCE_MARGIN = 5;
 
 const POWERUP_INTERVAL = 4.5;
@@ -378,10 +377,6 @@ export class Simulation {
   /** Patrolling walls travel until they reach a map edge, then turn around. */
   private updateObstacles(dt: number): void {
     for (const obstacle of this.obstacles) {
-      if (obstacle.hitCooldown > 0) {
-        obstacle.hitCooldown = Math.max(0, obstacle.hitCooldown - dt);
-      }
-
       if (obstacle.vx === 0 && obstacle.vy === 0) continue;
 
       obstacle.x += obstacle.vx * dt;
@@ -417,12 +412,13 @@ export class Simulation {
       // Push out along the shallower axis and reflect that component.
       if (overlapX < overlapY) {
         const side = cube.x < rect.x + rect.width / 2 ? -1 : 1;
+        const approachSpeed = -cube.vx * side;
         const speed = Math.abs(cube.vx);
         if (speed > 45) {
           this.emit({ type: "wall_hit", intensity: Math.min(speed / ref, 1.4), x: cube.x });
         }
-        if (rect.breakable && speed >= BREAKABLE_WALL_HIT_SPEED) {
-          this.registerBreakableHit(rect, cube.x, speed);
+        if (rect.breakable && approachSpeed >= BREAKABLE_WALL_HIT_SPEED) {
+          this.registerBreakableHit(rect, cube.x, approachSpeed);
         }
         const ahead = side < 0 ? rect.x - cube.half : rect.x + rect.width + cube.half;
         const behind = side < 0 ? rect.x + rect.width + cube.half : rect.x - cube.half;
@@ -435,12 +431,13 @@ export class Simulation {
         }
       } else {
         const side = cube.y < rect.y + rect.height / 2 ? -1 : 1;
+        const approachSpeed = -cube.vy * side;
         const speed = Math.abs(cube.vy);
         if (speed > 45) {
           this.emit({ type: "wall_hit", intensity: Math.min(speed / ref, 1.4), x: cube.x });
         }
-        if (rect.breakable && speed >= BREAKABLE_WALL_HIT_SPEED) {
-          this.registerBreakableHit(rect, cube.x, speed);
+        if (rect.breakable && approachSpeed >= BREAKABLE_WALL_HIT_SPEED) {
+          this.registerBreakableHit(rect, cube.x, approachSpeed);
         }
         const ahead = side < 0 ? rect.y - cube.half : rect.y + rect.height + cube.half;
         const behind = side < 0 ? rect.y + rect.height + cube.half : rect.y - cube.half;
@@ -916,9 +913,8 @@ export class Simulation {
   }
 
   private registerBreakableHit(obstacle: Obstacle, x: number, intensity: number): void {
-    if (!obstacle.breakable || obstacle.hitCooldown > 0 || obstacle.hitsRemaining <= 0) return;
+    if (!obstacle.breakable || obstacle.hitsRemaining <= 0) return;
 
-    obstacle.hitCooldown = BREAKABLE_WALL_HIT_COOLDOWN;
     obstacle.hitsRemaining -= 1;
     this.emit({ type: "wall_hit", intensity: Math.min(intensity / (BASE_SPEED * this.config.speed), 1.2), x });
 

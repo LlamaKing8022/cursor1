@@ -594,6 +594,41 @@ group("breakable walls crumble after enough cube hits", () => {
   check(sim.obstacles.length === 0, "breakable wall was destroyed by cube impacts");
 });
 
+group("breakable walls lose a hit on every cube impact", () => {
+  const map = createEmptyMap("Brick");
+  map.walls = [
+    {
+      x: 500,
+      y: 250,
+      width: 60,
+      height: 140,
+      direction: "none",
+      speed: 35,
+      breakable: true,
+      hitsToBreak: 4,
+    },
+  ];
+  const sim = new Simulation(configFor(map, "race", { cubeCount: 1, speed: 1 }));
+  const cube = sim.cubes[0];
+  const wall = sim.obstacles[0];
+
+  for (let hit = 0; hit < 4; hit += 1) {
+    cube.x = 430;
+    cube.y = 320;
+    cube.vx = 360;
+    cube.vy = 0;
+
+    const before = wall.hitsRemaining;
+    for (let step = 0; step < 40 && wall.hitsRemaining === before; step += 1) {
+      sim.step(FIXED_STEP);
+    }
+
+    check(wall.hitsRemaining === before - 1, `impact ${hit + 1} chipped the wall (${wall.hitsRemaining} left)`);
+  }
+
+  check(sim.obstacles.length === 0, "wall broke after four rapid hits");
+});
+
 group("bullets do not break breakable walls", () => {
   const map = gunMap("sniper");
   map.walls = [
