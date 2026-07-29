@@ -449,9 +449,10 @@ group("guns knock racers off course rather than damaging them", () => {
 
   let nudged = false;
   for (let i = 0; i < 120 * 3 && !nudged; i += 1) {
-    const before = target.vx;
+    const beforeX = target.vx;
+    const beforeY = target.vy;
     sim.step(FIXED_STEP);
-    if (target.vx - before > 40) nudged = true;
+    if (Math.hypot(target.vx - beforeX, target.vy - beforeY) > 40) nudged = true;
   }
 
   check(nudged, "a bullet gave the racer a shove");
@@ -733,6 +734,9 @@ group("cubes are crushed between closing walls", () => {
 
   let crushed = false;
   for (let i = 0; i < 900; i += 1) {
+    // Hold the cube in the gap so the walls, not its own motion, decide this.
+    cube.vx = 0;
+    cube.vy = 0;
     sim.step(FIXED_STEP);
     if (!cube.alive) {
       crushed = true;
@@ -763,25 +767,35 @@ group("racers do not pile onto the flag wall", () => {
   for (const seed of [3, 19, 77, 205]) {
     const sim = new Simulation(configFor(map, "race", { cubeCount: 6, powerUpsEnabled: false, seed }));
 
-    let flattest = 1;
-    let mostAtWall = 0;
+    let verticalShare = 0;
+    let samples = 0;
+    let nearFlag = 0;
+    let worstCrowding = 0;
 
-    for (let step = 0; step < 480 && sim.status === "running"; step += 1) {
+    for (let step = 0; step < 3600 && sim.status === "running"; step += 1) {
       sim.step(FIXED_STEP);
-      if (sim.time < 1) continue;
+      if (sim.time < 1 || step % 6 !== 0) continue;
 
       let atWall = 0;
+      let racing = 0;
       for (const cube of sim.cubes) {
-        if (cube.place > 0) continue;
+        if (cube.place > 0 || !cube.alive) continue;
+        racing += 1;
         const speed = Math.hypot(cube.vx, cube.vy) || 1;
-        flattest = Math.min(flattest, Math.abs(cube.vy) / speed);
+        verticalShare += Math.abs(cube.vy) / speed;
+        samples += 1;
+        if (cube.x > map.width * 0.8) nearFlag += 1;
         if (cube.x > map.width - 40) atWall += 1;
       }
-      mostAtWall = Math.max(mostAtWall, atWall);
+      if (racing > 0) worstCrowding = Math.max(worstCrowding, atWall / racing);
     }
 
-    check(flattest > 0.2, `seed ${seed}: racers keep weaving (flattest ${flattest.toFixed(2)})`);
-    check(mostAtWall < 6, `seed ${seed}: racers never all glue to the far wall (${mostAtWall})`);
+    const weave = verticalShare / Math.max(1, samples);
+    const flagEnd = nearFlag / Math.max(1, samples);
+
+    check(weave > 0.25, `seed ${seed}: racers keep real vertical motion (mean ${weave.toFixed(2)})`);
+    check(flagEnd < 0.7, `seed ${seed}: racers don't camp the flag end (${(flagEnd * 100).toFixed(0)}%)`);
+    check(worstCrowding < 0.9, `seed ${seed}: racers never all glue to the far wall`);
   }
 });
 

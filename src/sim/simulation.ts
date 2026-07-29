@@ -37,14 +37,16 @@ const STORM_CHIP_GRACE = 28;
 const STORM_SPEED = 18;
 const STORM_CHIP_DPS = 2.5;
 
-/** Race: forward pull ramps up so nobody can dawdle forever. */
-const RACE_FORWARD_ACCEL = 620;
 /**
- * The forward pull would otherwise flatten every racer into a straight
- * rightward line that piles up on the far wall. Keeping a slice of the speed
- * vertical means racers stay bouncy and can still find an off-centre flag.
+ * Race tracks are long, so cubes need a push down the track. Two limits keep
+ * that push from taking over the physics: it never claims more than a share of
+ * a cube's speed (uncapped it flattens every racer onto a dead-straight line),
+ * and it fades out over the last stretch so the run in to the flag is decided
+ * by ordinary bouncing rather than by cubes being shoved into the end wall.
  */
-const RACE_MIN_VERTICAL_SHARE = 0.34;
+const RACE_DRIFT_ACCEL = 620;
+const RACE_MAX_DRIFT_SHARE = 0.72;
+const RACE_DRIFT_TAPER = 620;
 const RACE_FINISH_MARGIN = 70;
 const RACE_PODIUM_GRACE = 2.5;
 const HARD_TIME_LIMIT = 180;
@@ -62,6 +64,8 @@ export class Simulation {
   readonly obstacles: Obstacle[];
   readonly finishX: number | null;
   readonly finishZones: Rect[];
+  /** Nearest x a racer has to reach, from either a placed flag or the line. */
+  readonly raceTargetX: number | null;
 
   cubes: Cube[] = [];
   powerUps: PowerUp[] = [];
@@ -114,6 +118,12 @@ export class Simulation {
     this.finishZones = this.customMap?.finishZones.map((zone) => ({ ...zone })) ?? [];
     this.finishX =
       config.mode === "race" && !this.customMap ? this.bounds.width - RACE_FINISH_MARGIN : null;
+    this.raceTargetX =
+      config.mode !== "race"
+        ? null
+        : this.finishZones.length > 0
+          ? Math.min(...this.finishZones.map((zone) => zone.x))
+          : this.finishX;
     this.stormDelay = STORM_BASE_DELAY + config.cubeCount;
     this.stormChipDelay = this.stormDelay + STORM_CHIP_GRACE;
     this.spawnCubes();
@@ -312,10 +322,9 @@ export class Simulation {
   }
 
   private integrate(cube: Cube, dt: number, finishedRacer = false): void {
-    // Finished racers coast through the flag; only active racers get the forward pull.
+    // Finished racers coast; only cubes still racing get the drift.
     if (this.config.mode === "race" && !finishedRacer) {
-      const urgency = 1 + Math.max(0, this.time - 45) * 0.05;
-      cube.vx += RACE_FORWARD_ACCEL * urgency * dt;
+      this.applyRaceDrift(cube, dt);
     }
 
     const previousX = cube.x;
@@ -325,23 +334,22 @@ export class Simulation {
     cube.distanceTravelled += Math.hypot(cube.x - previousX, cube.y - previousY);
 
     this.regulateSpeed(cube, dt);
-
-    if (this.config.mode === "race" && !finishedRacer) {
-      this.keepRacerBouncing(cube);
-    }
   }
 
-  /** Trades a little forward speed for vertical speed so racers keep weaving. */
-  private keepRacerBouncing(cube: Cube): void {
-    const speed = Math.hypot(cube.vx, cube.vy);
-    if (speed < 1e-3) return;
+  /** Carries racers down the track, easing off as they approach the finish. */
+  private applyRaceDrift(cube: Cube, dt: number): void {
+    if (this.raceTargetX === null) return;
 
-    const minVertical = speed * RACE_MIN_VERTICAL_SHARE;
-    if (Math.abs(cube.vy) >= minVertical) return;
+    const remaining = this.raceTargetX - cube.x;
+    if (remaining <= 0) return;
 
-    cube.vy = (cube.vy < 0 ? -1 : 1) * minVertical;
-    cube.vx =
-      (cube.vx < 0 ? -1 : 1) * Math.sqrt(Math.max(0, speed * speed - minVertical * minVertical));
+    const closing = Math.min(1, remaining / RACE_DRIFT_TAPER);
+    const urgency = 1 + Math.max(0, this.time - 45) * 0.05;
+    const share = Math.min(RACE_MAX_DRIFT_SHARE * urgency, 1) * closing;
+    const cap = BASE_SPEED * this.config.speed * share;
+    if (cube.vx >= cap) return;
+
+    cube.vx = Math.min(cap, cube.vx + RACE_DRIFT_ACCEL * urgency * closing * dt);
   }
 
   /**
