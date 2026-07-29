@@ -753,6 +753,38 @@ group("placed finish zones are preserved through validation", () => {
   check((cleaned?.finishZones[0].width ?? 0) >= 32, "finish zone width is usable");
 });
 
+group("racers do not pile onto the flag wall", () => {
+  const map = createEmptyMap("Flag corner");
+  map.width = 1200;
+  // An off-centre flag: racers have to weave to reach it.
+  map.finishZones = [{ x: 1080, y: 40, width: 48, height: 120 }];
+  map.spawnZones = [{ x: 40, y: 40, width: 160, height: MAP_HEIGHT - 80 }];
+
+  for (const seed of [3, 19, 77, 205]) {
+    const sim = new Simulation(configFor(map, "race", { cubeCount: 6, powerUpsEnabled: false, seed }));
+
+    let flattest = 1;
+    let mostAtWall = 0;
+
+    for (let step = 0; step < 480 && sim.status === "running"; step += 1) {
+      sim.step(FIXED_STEP);
+      if (sim.time < 1) continue;
+
+      let atWall = 0;
+      for (const cube of sim.cubes) {
+        if (cube.place > 0) continue;
+        const speed = Math.hypot(cube.vx, cube.vy) || 1;
+        flattest = Math.min(flattest, Math.abs(cube.vy) / speed);
+        if (cube.x > map.width - 40) atWall += 1;
+      }
+      mostAtWall = Math.max(mostAtWall, atWall);
+    }
+
+    check(flattest > 0.2, `seed ${seed}: racers keep weaving (flattest ${flattest.toFixed(2)})`);
+    check(mostAtWall < 6, `seed ${seed}: racers never all glue to the far wall (${mostAtWall})`);
+  }
+});
+
 group("finished racers coast through the flag", () => {
   const map = createEmptyMap();
   map.width = 800;

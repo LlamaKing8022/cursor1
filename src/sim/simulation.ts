@@ -39,6 +39,12 @@ const STORM_CHIP_DPS = 2.5;
 
 /** Race: forward pull ramps up so nobody can dawdle forever. */
 const RACE_FORWARD_ACCEL = 620;
+/**
+ * The forward pull would otherwise flatten every racer into a straight
+ * rightward line that piles up on the far wall. Keeping a slice of the speed
+ * vertical means racers stay bouncy and can still find an off-centre flag.
+ */
+const RACE_MIN_VERTICAL_SHARE = 0.34;
 const RACE_FINISH_MARGIN = 70;
 const RACE_PODIUM_GRACE = 2.5;
 const HARD_TIME_LIMIT = 180;
@@ -319,6 +325,23 @@ export class Simulation {
     cube.distanceTravelled += Math.hypot(cube.x - previousX, cube.y - previousY);
 
     this.regulateSpeed(cube, dt);
+
+    if (this.config.mode === "race" && !finishedRacer) {
+      this.keepRacerBouncing(cube);
+    }
+  }
+
+  /** Trades a little forward speed for vertical speed so racers keep weaving. */
+  private keepRacerBouncing(cube: Cube): void {
+    const speed = Math.hypot(cube.vx, cube.vy);
+    if (speed < 1e-3) return;
+
+    const minVertical = speed * RACE_MIN_VERTICAL_SHARE;
+    if (Math.abs(cube.vy) >= minVertical) return;
+
+    cube.vy = (cube.vy < 0 ? -1 : 1) * minVertical;
+    cube.vx =
+      (cube.vx < 0 ? -1 : 1) * Math.sqrt(Math.max(0, speed * speed - minVertical * minVertical));
   }
 
   /**
@@ -344,7 +367,6 @@ export class Simulation {
 
   private collideWithBounds(cube: Cube): void {
     const b = this.activeBounds;
-    const isRace = this.config.mode === "race";
     const ref = BASE_SPEED * this.config.speed * 2;
 
     if (cube.x - cube.half < b.x) {
@@ -356,9 +378,7 @@ export class Simulation {
       const speed = Math.abs(cube.vx);
       if (speed > 45) this.emit({ type: "wall_hit", intensity: Math.min(speed / ref, 1.4), x: cube.x });
       cube.x = b.x + b.width - cube.half;
-      // In race mode the right wall sits past the finish line, so this only
-      // matters for the battle arena.
-      if (!isRace) cube.vx = -Math.abs(cube.vx) * RESTITUTION;
+      cube.vx = -Math.abs(cube.vx) * RESTITUTION;
     }
 
     if (cube.y - cube.half < b.y) {
