@@ -106,14 +106,16 @@
           </div>
         </fieldset>
 
-        <div class="field">
-          <label for="input-count">Cubes <output id="out-count">8</output></label>
-          <input id="input-count" name="count" type="range" min="2" max="16" step="1" value="8" />
-        </div>
+        <div class="field-pair">
+          <div class="field">
+            <label for="input-count">Cubes <output id="out-count">8</output></label>
+            <input id="input-count" name="count" type="range" min="2" max="16" step="1" value="8" />
+          </div>
 
-        <div class="field">
-          <label for="input-speed">Speed <output id="out-speed">1.0x</output></label>
-          <input id="input-speed" name="speed" type="range" min="0.5" max="2.5" step="0.1" value="1" />
+          <div class="field">
+            <label for="input-speed">Speed <output id="out-speed">1.0x</output></label>
+            <input id="input-speed" name="speed" type="range" min="0.5" max="2.5" step="0.1" value="1" />
+          </div>
         </div>
 
         <div class="field" id="field-hp">
@@ -255,7 +257,7 @@
               </select>
             </div>
 
-            <div class="editor-size-row">
+            <div class="field-pair">
               <div class="field">
                 <label for="editor-width">Width <output id="editor-width-out">1200</output></label>
                 <input id="editor-width" type="range" min="800" max="3600" step="100" value="1200" />

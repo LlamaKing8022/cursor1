@@ -436,7 +436,7 @@ canvas {
   width: min(450px, 100%);
   max-height: 90vh;
   overflow-y: auto;
-  padding: 24px;
+  padding: 22px;
   background: var(--panel);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
@@ -452,22 +452,33 @@ canvas {
 }
 
 .modal-sub {
-  margin: 6px 0 20px;
+  margin: 5px 0 18px;
   font-size: 13px;
   color: var(--dim);
 }
 
 .field {
-  margin-bottom: 15px;
+  margin-bottom: 14px;
   border: none;
   padding: 0;
+}
+
+.field-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.field-pair .field {
+  margin-bottom: 0;
 }
 
 .field > label,
 .field > legend {
   display: flex;
-  justify-content: space-between;
   align-items: baseline;
+  gap: 8px;
   margin-bottom: 6px;
   font-size: 11px;
   font-weight: 700;
@@ -483,15 +494,57 @@ canvas {
   opacity: 0.75;
 }
 
+/* Readouts sit hard right so a column of sliders lines its numbers up. */
 .field output {
+  margin-left: auto;
   font-family: var(--mono);
   font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0;
   color: var(--text);
 }
 
+/* Square thumb on a thin track, to echo the cubes and avoid the stock
+   pill-shaped control the browser would otherwise draw. */
 input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
   width: 100%;
-  accent-color: var(--pink);
+  height: 14px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  background: var(--panel-3);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4px;
+  background: var(--pink);
+}
+
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  background: var(--panel-3);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: var(--pink);
+  border: none;
+  border-radius: 0;
+}
+
+input[type="range"]:focus-visible {
+  outline: 2px solid var(--pink-bright);
+  outline-offset: 2px;
 }
 
 input[type="text"],
@@ -534,7 +587,7 @@ input:disabled {
   display: flex;
   gap: 10px;
   align-items: flex-start;
-  padding: 10px 12px;
+  padding: 9px 11px;
   background: var(--panel-2);
   border: 1px solid var(--line-strong);
   border-left-width: 3px;
@@ -579,14 +632,19 @@ input:disabled {
   flex-wrap: wrap;
 }
 
-.checkbox {
+/* Matches `.field > label` specificity so checkbox rows keep sentence case
+   instead of picking up the uppercase treatment used for slider labels. */
+label.checkbox {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
-  cursor: pointer;
-  color: var(--text);
   margin: 0;
+  font-size: 13px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text);
+  cursor: pointer;
 }
 
 .checkbox input {
@@ -599,8 +657,8 @@ input:disabled {
   display: flex;
   justify-content: flex-end;
   gap: 9px;
-  margin-top: 22px;
-  padding-top: 18px;
+  margin-top: 18px;
+  padding-top: 14px;
   border-top: 1px solid var(--line);
 }
 
@@ -687,15 +745,9 @@ input:disabled {
   margin-bottom: 12px;
 }
 
-.editor-size-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+.editor-panel .field-pair {
   gap: 12px;
   margin-bottom: 12px;
-}
-
-.editor-size-row .field {
-  margin-bottom: 0;
 }
 
 .tool-grid {
