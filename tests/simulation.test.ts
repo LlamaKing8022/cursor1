@@ -7,7 +7,10 @@ import {
   clampCubeSize,
 } from "../src/sim/simulation";
 import { DEFAULT_ARENA_HEIGHT } from "../src/sim/arena";
+import { ARENA_STYLES } from "../src/sim/types";
 import type { ArenaStyle, GameMode, SimConfig } from "../src/sim/types";
+import { CUBE_COLORS, CUBE_NAMES, MAX_CUBES } from "../src/sim/roster";
+import { themeFor } from "../src/render/theme";
 
 let failures = 0;
 let checks = 0;
@@ -57,7 +60,7 @@ function runMatch(config: SimConfig, maxSeconds = 400) {
 }
 
 const MODES: GameMode[] = ["battle", "race"];
-const STYLES: ArenaStyle[] = ["open", "pillars", "maze"];
+const STYLES: readonly ArenaStyle[] = ARENA_STYLES;
 
 group("every match reaches a conclusion", () => {
   for (const mode of MODES) {
@@ -177,14 +180,34 @@ group("battles are decided by fighting, not by the storm", () => {
   console.log(`  (storm decided ${stormDecided}/${total})`);
 });
 
-group("cube counts from 2 to 16 all work", () => {
-  for (let count = 2; count <= 16; count += 1) {
+group(`cube counts from 2 to ${MAX_CUBES} all work`, () => {
+  for (let count = 2; count <= MAX_CUBES; count += 1) {
     for (const mode of MODES) {
       const { sim } = runMatch(baseConfig({ mode, cubeCount: count, seed: 2000 + count }));
       check(sim.cubes.length === count, `${mode}: spawned ${sim.cubes.length}/${count} cubes`);
       check(sim.status === "finished", `${mode} with ${count} cubes finished`);
     }
   }
+});
+
+group("a full roster gets its own colour and name", () => {
+  check(CUBE_COLORS.length === CUBE_NAMES.length, "every colour has a matching name");
+  check(new Set(CUBE_COLORS).size === CUBE_COLORS.length, "no colour is repeated");
+  check(new Set(CUBE_NAMES).size === CUBE_NAMES.length, "no name is repeated");
+  check(
+    CUBE_COLORS.every((color) => /^#[0-9a-f]{6}$/.test(color)),
+    "every colour is a six-digit hex value",
+  );
+
+  const sim = new Simulation(baseConfig({ cubeCount: MAX_CUBES, arenaStyle: "open" }));
+  check(
+    new Set(sim.cubes.map((cube) => cube.color)).size === MAX_CUBES,
+    `all ${MAX_CUBES} cubes look different`,
+  );
+  check(
+    new Set(sim.cubes.map((cube) => cube.name)).size === MAX_CUBES,
+    `all ${MAX_CUBES} cubes are named differently`,
+  );
 });
 
 group("physics stays stable", () => {
@@ -345,6 +368,56 @@ group("arena height changes generated bounds", () => {
   const sim = new Simulation(baseConfig({ arenaHeight: 960, arenaStyle: "open" }));
   check(sim.bounds.height === 960, "taller generated arena uses the requested height");
   check(sim.bounds.height !== DEFAULT_ARENA_HEIGHT, "height differs from the default");
+});
+
+group("every arena style builds its own layout", () => {
+  const signatures = new Map<string, ArenaStyle[]>();
+
+  for (const arenaStyle of STYLES) {
+    for (const mode of MODES) {
+      const sim = new Simulation(baseConfig({ mode, arenaStyle, seed: 4242 }));
+      const inBounds = sim.obstacles.every(
+        (wall) =>
+          wall.x >= -1 &&
+          wall.y >= -1 &&
+          wall.x + wall.width <= sim.bounds.width + 1 &&
+          wall.y + wall.height <= sim.bounds.height + 1,
+      );
+      const sized = sim.obstacles.every((wall) => wall.width > 0 && wall.height > 0);
+
+      check(inBounds, `${mode}/${arenaStyle}: every wall sits inside the arena`);
+      check(sized, `${mode}/${arenaStyle}: no degenerate walls`);
+      if (arenaStyle !== "open" || mode === "race") {
+        check(sim.obstacles.length > 0, `${mode}/${arenaStyle}: layout has walls`);
+      }
+
+      const key = `${mode}:${sim.obstacles
+        .map((w) => `${Math.round(w.x)},${Math.round(w.y)},${Math.round(w.width)},${Math.round(w.height)}`)
+        .join("|")}`;
+      const seen = signatures.get(key) ?? [];
+      seen.push(arenaStyle);
+      signatures.set(key, seen);
+    }
+  }
+
+  const duplicates = [...signatures.values()].filter((styles) => styles.length > 1);
+  check(duplicates.length === 0, `no two styles share a layout (${JSON.stringify(duplicates)})`);
+});
+
+group("every arena style has its own palette", () => {
+  const themes = STYLES.map((style) => themeFor(style));
+  check(
+    themes.every((theme) => theme.obstacleFills.length >= 3),
+    "each palette offers enough wall shades",
+  );
+  check(
+    new Set(themes.map((theme) => theme.accent)).size === STYLES.length,
+    "every style has a distinct accent colour",
+  );
+  check(
+    new Set(themes.map((theme) => `${theme.floor}/${theme.obstacleFills[0]}`)).size >= 4,
+    "styles do not all share one floor and wall combination",
+  );
 });
 
 group("cube size setting resizes the cubes", () => {

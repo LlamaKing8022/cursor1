@@ -109,7 +109,7 @@
         <div class="field-pair">
           <div class="field">
             <label for="input-count">Cubes <output id="out-count">8</output></label>
-            <input id="input-count" name="count" type="range" min="2" max="16" step="1" value="8" />
+            <input id="input-count" name="count" type="range" min="2" max="24" step="1" value="8" />
           </div>
 
           <div class="field">
@@ -136,6 +136,9 @@
             <option value="pillars" selected>Pillars (a few obstacles)</option>
             <option value="open">Open (wide and empty)</option>
             <option value="maze">Maze (tight and chaotic)</option>
+            <option value="corridors">Corridors (weaving lanes)</option>
+            <option value="rings">Rings (open middle, walled edges)</option>
+            <option value="grid">Grid (evenly scattered blocks)</option>
           </select>
         </div>
 
@@ -281,6 +284,9 @@
                 <option value="pillars" selected>Magenta</option>
                 <option value="open">Blue</option>
                 <option value="maze">Green</option>
+                <option value="corridors">Ice</option>
+                <option value="rings">Desert</option>
+                <option value="grid">Twilight</option>
               </select>
             </div>
 

@@ -1,3 +1,4 @@
+import { ARENA_STYLES } from "./types";
 import type { ArenaStyle, PowerUpKind, Rect } from "./types";
 import { isGunKind, type GunKind } from "./guns";
 
@@ -61,7 +62,7 @@ export interface CustomMap {
   guns: GunSpot[];
 }
 
-const PALETTES: ArenaStyle[] = ["open", "pillars", "maze"];
+const PALETTES: readonly ArenaStyle[] = ARENA_STYLES;
 const SPOT_KINDS: SpotKind[] = ["random", "heal", "rage", "speed", "shield"];
 const WALL_DIRECTIONS: WallDirection[] = ["none", "left", "right", "up", "down"];
 

@@ -1,4 +1,7 @@
-/** Bold arcade colours — primaries first for small rosters. */
+/**
+ * Bold arcade colours — primaries first so small rosters stay easy to tell
+ * apart, then paler and darker shades once the field gets crowded.
+ */
 export const CUBE_COLORS = [
   "#f44336",
   "#2196f3",
@@ -16,6 +19,14 @@ export const CUBE_COLORS = [
   "#673ab7",
   "#ff5722",
   "#607d8b",
+  "#00e676",
+  "#d500f9",
+  "#795548",
+  "#82b1ff",
+  "#ff80ab",
+  "#ffd180",
+  "#4db6ac",
+  "#b388ff",
 ] as const;
 
 export const CUBE_NAMES = [
@@ -35,6 +46,14 @@ export const CUBE_NAMES = [
   "Orchid",
   "Rust",
   "Slate",
+  "Jade",
+  "Magenta",
+  "Cocoa",
+  "Sky",
+  "Blush",
+  "Cream",
+  "Seafoam",
+  "Lilac",
 ] as const;
 
 export const MAX_CUBES = CUBE_COLORS.length;

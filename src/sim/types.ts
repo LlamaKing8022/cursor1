@@ -130,7 +130,17 @@ export interface SimConfig {
   customMap?: CustomMap | null;
 }
 
-export type ArenaStyle = "open" | "pillars" | "maze";
+/** Every built-in arena layout. Also doubles as the colour palette for maps. */
+export const ARENA_STYLES = [
+  "pillars",
+  "open",
+  "maze",
+  "corridors",
+  "rings",
+  "grid",
+] as const;
+
+export type ArenaStyle = (typeof ARENA_STYLES)[number];
 
 export interface SimSnapshot {
   status: MatchStatus;

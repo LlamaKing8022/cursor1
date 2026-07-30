@@ -57,6 +57,35 @@ const BASE: Omit<ArenaTheme, "accent" | "obstacleFills"> = {
   floorBottom: "#f3aac4",
 };
 
+/** Builds a palette that recolours the floor, walls and letterbox together. */
+function palette(options: {
+  floor: string;
+  floorEdge: string;
+  speckle: string;
+  grid: string;
+  walls: [string, string, string];
+  wallStroke: string;
+  checkerLight: string;
+  checkerDark: string;
+  accent: string;
+}): ArenaTheme {
+  return {
+    ...BASE,
+    floor: options.floor,
+    floorTop: options.floor,
+    floorBottom: options.floorEdge,
+    floorSpeckle: options.speckle,
+    grid: options.grid,
+    obstacleFills: options.walls,
+    obstacleStroke: options.wallStroke,
+    checkerLight: options.checkerLight,
+    checkerDark: options.checkerDark,
+    backdropTop: options.checkerDark,
+    backdropBottom: options.checkerDark,
+    accent: options.accent,
+  };
+}
+
 const THEMES: Record<ArenaStyle, ArenaTheme> = {
   open: {
     ...BASE,
@@ -73,6 +102,39 @@ const THEMES: Record<ArenaStyle, ArenaTheme> = {
     obstacleFills: [WALL_DARK, WALL, "#9e458f"],
     accent: "#4caf50",
   },
+  corridors: palette({
+    floor: "#c5e7f7",
+    floorEdge: "#aad8ee",
+    speckle: "rgba(21, 101, 192, 0.34)",
+    grid: "rgba(23, 74, 110, 0.14)",
+    walls: ["#215f8b", "#2b76aa", "#18496b"],
+    wallStroke: "#123c58",
+    checkerLight: "#5f7f96",
+    checkerDark: "#22384a",
+    accent: "#ff8f00",
+  }),
+  rings: palette({
+    floor: "#ffe2b8",
+    floorEdge: "#f6cd93",
+    speckle: "rgba(191, 90, 30, 0.32)",
+    grid: "rgba(122, 58, 31, 0.14)",
+    walls: ["#a45530", "#bb6636", "#8a4527"],
+    wallStroke: "#6d3520",
+    checkerLight: "#9a7250",
+    checkerDark: "#42291a",
+    accent: "#00838f",
+  }),
+  grid: palette({
+    floor: "#ded3f5",
+    floorEdge: "#c8b8ec",
+    speckle: "rgba(69, 39, 160, 0.3)",
+    grid: "rgba(58, 46, 112, 0.15)",
+    walls: ["#4b3c92", "#5a48ab", "#392d70"],
+    wallStroke: "#2c2257",
+    checkerLight: "#736898",
+    checkerDark: "#2b2444",
+    accent: "#c0ca33",
+  }),
 };
 
 export function themeFor(style: ArenaStyle): ArenaTheme {

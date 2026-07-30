@@ -13,7 +13,9 @@ import { findMap, loadMaps } from "./editor/storage";
 import { findCloseSeeds, findEngagingSeeds } from "./sim/seedFinder";
 import type { SeedScoring } from "./sim/seedFinder";
 import type { CustomMap } from "./sim/map";
+import { ARENA_STYLES } from "./sim/types";
 import type { ArenaStyle, Cube, GameMode, SimConfig } from "./sim/types";
+import { MAX_CUBES } from "./sim/roster";
 
 const MAX_STEPS_PER_FRAME = 12;
 
@@ -353,19 +355,22 @@ function openSetup(): void {
   setRunning(false);
 }
 
-const BUILT_IN_ARENAS: Array<[ArenaStyle, string]> = [
-  ["pillars", "Pillars (a few obstacles)"],
-  ["open", "Open (wide and empty)"],
-  ["maze", "Maze (tight and chaotic)"],
-];
+const ARENA_LABELS: Record<ArenaStyle, string> = {
+  pillars: "Pillars (a few obstacles)",
+  open: "Open (wide and empty)",
+  maze: "Maze (tight and chaotic)",
+  corridors: "Corridors (weaving lanes)",
+  rings: "Rings (open middle, walled edges)",
+  grid: "Grid (evenly scattered blocks)",
+};
 
 /** Rebuilds the arena dropdown so newly saved custom maps show up. */
 function refreshArenaOptions(): void {
   const previous = ui.arena.value;
   const generated = document.createElement("optgroup");
   generated.label = "Generated";
-  for (const [value, label] of BUILT_IN_ARENAS) {
-    generated.append(new Option(label, value));
+  for (const style of ARENA_STYLES) {
+    generated.append(new Option(ARENA_LABELS[style], style));
   }
 
   const nodes: Array<HTMLOptGroupElement> = [generated];
@@ -620,6 +625,9 @@ function unlockAudio(): void {
 
 window.addEventListener("pointerdown", unlockAudio, { once: true });
 window.addEventListener("keydown", unlockAudio, { once: true });
+
+// The roster caps how many cubes can have a colour of their own.
+ui.count.max = String(MAX_CUBES);
 
 setTimeScale(1);
 startMatch(config);
