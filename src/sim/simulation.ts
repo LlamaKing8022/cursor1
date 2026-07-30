@@ -20,8 +20,18 @@ import type {
 } from "./types";
 
 const BASE_SPEED = 250;
-const CUBE_HALF = 16;
 const RESTITUTION = 1;
+
+/** Cube edge length in pixels. The storm floor is 200px, so the max stays clear of it. */
+export const DEFAULT_CUBE_SIZE = 32;
+export const MIN_CUBE_SIZE = 12;
+export const MAX_CUBE_SIZE = 72;
+
+export function clampCubeSize(value: number): number {
+  if (!Number.isFinite(value)) return DEFAULT_CUBE_SIZE;
+  return Math.min(MAX_CUBE_SIZE, Math.max(MIN_CUBE_SIZE, Math.round(value)));
+}
+
 const TRAIL_LENGTH = 14;
 const TRAIL_INTERVAL = 0.05;
 
@@ -54,6 +64,8 @@ export class Simulation {
   readonly obstacles: Obstacle[];
   readonly finishX: number | null;
   readonly finishZones: Rect[];
+  /** Half-extent every cube spawns with, from the configured cube size. */
+  readonly cubeHalf: number;
 
   cubes: Cube[] = [];
   powerUps: PowerUp[] = [];
@@ -93,6 +105,7 @@ export class Simulation {
       ? Math.min(Math.max(2, config.teamCount), config.cubeCount)
       : 1;
     this.customMap = config.customMap ?? null;
+    this.cubeHalf = clampCubeSize(config.cubeSize) / 2;
     this.bounds = createBounds(config.mode, config.arenaStyle, this.customMap, config.arenaHeight);
     this.obstacles = createObstacles(
       config.mode,
@@ -229,7 +242,7 @@ export class Simulation {
         y: spawn.y,
         vx: this.config.mode === "race" ? Math.abs(heading.x) * speed : heading.x * speed,
         vy: heading.y * speed,
-        half: CUBE_HALF,
+        half: this.cubeHalf,
         hp: this.config.startingHp,
         maxHp: this.config.startingHp,
         alive: true,
@@ -264,7 +277,8 @@ export class Simulation {
       const row = index % perColumn;
       const spacing = (this.bounds.height - 80) / Math.max(perColumn - 1, 1);
       return {
-        x: 70 + column * 60,
+        // Columns are spread by cube size so big cubes do not start overlapping.
+        x: this.cubeHalf + 54 + column * Math.max(60, this.cubeHalf * 2 + 8),
         y: 40 + row * spacing,
       };
     }
@@ -298,8 +312,8 @@ export class Simulation {
     const y = zone.y + ((row + 0.5) * zone.height) / rows;
 
     return {
-      x: Math.min(Math.max(x, CUBE_HALF), this.bounds.width - CUBE_HALF),
-      y: Math.min(Math.max(y, CUBE_HALF), this.bounds.height - CUBE_HALF),
+      x: Math.min(Math.max(x, this.cubeHalf), this.bounds.width - this.cubeHalf),
+      y: Math.min(Math.max(y, this.cubeHalf), this.bounds.height - this.cubeHalf),
     };
   }
 

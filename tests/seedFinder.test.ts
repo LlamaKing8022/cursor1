@@ -4,6 +4,7 @@ import { collectMatchStats } from "../src/sim/matchStats";
 import { runMatchToCompletion } from "../src/sim/matchRunner";
 import { findBestSeedSync } from "../src/sim/seedFinder";
 import { DEFAULT_ARENA_HEIGHT } from "../src/sim/arena";
+import { DEFAULT_CUBE_SIZE } from "../src/sim/simulation";
 import type { SimConfig } from "../src/sim/types";
 
 let failures = 0;
@@ -35,6 +36,7 @@ function baseConfig(overrides: Partial<SimConfig> = {}): SimConfig {
     teamCount: 2,
     collisionDamage: true,
     arenaHeight: DEFAULT_ARENA_HEIGHT,
+    cubeSize: DEFAULT_CUBE_SIZE,
     ...overrides,
   };
 }

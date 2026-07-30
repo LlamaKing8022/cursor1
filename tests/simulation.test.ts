@@ -1,4 +1,11 @@
-import { FIXED_STEP, Simulation } from "../src/sim/simulation";
+import {
+  DEFAULT_CUBE_SIZE,
+  FIXED_STEP,
+  MAX_CUBE_SIZE,
+  MIN_CUBE_SIZE,
+  Simulation,
+  clampCubeSize,
+} from "../src/sim/simulation";
 import { DEFAULT_ARENA_HEIGHT } from "../src/sim/arena";
 import type { ArenaStyle, GameMode, SimConfig } from "../src/sim/types";
 
@@ -31,6 +38,7 @@ function baseConfig(overrides: Partial<SimConfig> = {}): SimConfig {
     teamCount: 2,
     collisionDamage: true,
     arenaHeight: DEFAULT_ARENA_HEIGHT,
+    cubeSize: DEFAULT_CUBE_SIZE,
     ...overrides,
   };
 }
@@ -337,6 +345,40 @@ group("arena height changes generated bounds", () => {
   const sim = new Simulation(baseConfig({ arenaHeight: 960, arenaStyle: "open" }));
   check(sim.bounds.height === 960, "taller generated arena uses the requested height");
   check(sim.bounds.height !== DEFAULT_ARENA_HEIGHT, "height differs from the default");
+});
+
+group("cube size setting resizes the cubes", () => {
+  for (const cubeSize of [MIN_CUBE_SIZE, DEFAULT_CUBE_SIZE, MAX_CUBE_SIZE]) {
+    const sim = new Simulation(baseConfig({ cubeSize }));
+    check(
+      sim.cubes.every((cube) => cube.half === cubeSize / 2),
+      `cube size ${cubeSize}: every cube spans ${cubeSize}px`,
+    );
+    check(
+      sim.cubes.every(
+        (cube) =>
+          cube.x - cube.half >= -1 &&
+          cube.y - cube.half >= -1 &&
+          cube.x + cube.half <= sim.bounds.width + 1 &&
+          cube.y + cube.half <= sim.bounds.height + 1,
+      ),
+      `cube size ${cubeSize}: cubes spawn inside the arena`,
+    );
+  }
+
+  check(clampCubeSize(2) === MIN_CUBE_SIZE, "undersized request raised to the minimum");
+  check(clampCubeSize(9999) === MAX_CUBE_SIZE, "oversized request clamped to the maximum");
+  check(clampCubeSize(Number.NaN) === DEFAULT_CUBE_SIZE, "nonsense request falls back to default");
+});
+
+group("matches still conclude at either cube size extreme", () => {
+  for (const cubeSize of [MIN_CUBE_SIZE, MAX_CUBE_SIZE]) {
+    for (const mode of MODES) {
+      const { sim } = runMatch(baseConfig({ mode, cubeSize, seed: 808 }));
+      check(sim.status === "finished", `${mode} at ${cubeSize}px concluded`);
+      check(sim.winner !== null, `${mode} at ${cubeSize}px named a winner`);
+    }
+  }
 });
 
 console.log(`\n${checks - failures}/${checks} checks passed`);

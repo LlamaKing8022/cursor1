@@ -1,4 +1,4 @@
-import { FIXED_STEP, Simulation } from "../src/sim/simulation";
+import { DEFAULT_CUBE_SIZE, FIXED_STEP, Simulation } from "../src/sim/simulation";
 import { DEFAULT_ARENA_HEIGHT } from "../src/sim/arena";
 import { MAP_HEIGHT, createEmptyMap, normalizeMap, type CustomMap } from "../src/sim/map";
 import { GUNS } from "../src/sim/guns";
@@ -33,6 +33,7 @@ function configFor(map: CustomMap, mode: GameMode, overrides: Partial<SimConfig>
     teamCount: 2,
     collisionDamage: true,
     arenaHeight: DEFAULT_ARENA_HEIGHT,
+    cubeSize: DEFAULT_CUBE_SIZE,
     customMap: map,
     ...overrides,
   };

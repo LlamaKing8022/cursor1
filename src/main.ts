@@ -1,6 +1,6 @@
 import "./style.css";
 import { DEFAULT_ARENA_HEIGHT } from "./sim/arena";
-import { FIXED_STEP, Simulation } from "./sim/simulation";
+import { DEFAULT_CUBE_SIZE, FIXED_STEP, Simulation } from "./sim/simulation";
 import { Renderer } from "./render/renderer";
 import { randomSeed, seedFromString } from "./sim/rng";
 import { GUNS } from "./sim/guns";
@@ -57,6 +57,8 @@ const ui = {
   hp: required<HTMLInputElement>("input-hp"),
   hpOut: required<HTMLOutputElement>("out-hp"),
   hpField: required<HTMLDivElement>("field-hp"),
+  cubeSize: required<HTMLInputElement>("input-cube-size"),
+  cubeSizeOut: required<HTMLOutputElement>("out-cube-size"),
   arena: required<HTMLSelectElement>("input-arena"),
   powerUps: required<HTMLInputElement>("input-powerups"),
   teams: required<HTMLInputElement>("input-teams"),
@@ -84,6 +86,7 @@ let config: SimConfig = {
   teamCount: 2,
   collisionDamage: true,
   arenaHeight: DEFAULT_ARENA_HEIGHT,
+  cubeSize: DEFAULT_CUBE_SIZE,
   customMap: null,
 };
 
@@ -395,6 +398,7 @@ function syncSetupForm(): void {
   ui.count.value = String(config.cubeCount);
   ui.speed.value = String(config.speed);
   ui.hp.value = String(config.startingHp);
+  ui.cubeSize.value = String(config.cubeSize);
   ui.arena.value = config.customMap ? `custom:${config.customMap.id}` : config.arenaStyle;
   ui.powerUps.checked = config.powerUpsEnabled;
   ui.teams.checked = config.teamMode;
@@ -428,6 +432,7 @@ function configFromSetupForm(): Omit<SimConfig, "seed"> {
     teamCount: Number(ui.teamCount.value),
     collisionDamage: ui.collisionDamage.checked,
     arenaHeight: DEFAULT_ARENA_HEIGHT,
+    cubeSize: Number(ui.cubeSize.value),
     customMap: customMap ?? null,
   };
 }
@@ -459,6 +464,7 @@ function refreshSetupOutputs(): void {
   ui.countOut.textContent = ui.count.value;
   ui.speedOut.textContent = `${Number(ui.speed.value).toFixed(1)}x`;
   ui.hpOut.textContent = ui.hp.value;
+  ui.cubeSizeOut.textContent = `${ui.cubeSize.value}px`;
   ui.teamCountOut.textContent = ui.teamCount.value;
 
   const battle = selectedMode() === "battle";

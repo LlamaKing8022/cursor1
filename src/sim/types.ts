@@ -124,6 +124,8 @@ export interface SimConfig {
   collisionDamage: boolean;
   /** Generated-arena height in pixels. Custom maps use their own height. */
   arenaHeight: number;
+  /** Cube edge length in pixels. */
+  cubeSize: number;
   /** When set, replaces the generated arena with a hand-built map. */
   customMap?: CustomMap | null;
 }
