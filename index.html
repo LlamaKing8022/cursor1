@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cube Arena — Battle &amp; Race Simulator</title>
+    <meta
+      name="description"
+      content="Watch coloured cubes bounce around an arena fighting to be the last one alive, or race to the finish line."
+    />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark"></span>
+          <div>
+            <h1>Cube Arena</h1>
+            <p id="mode-label">Battle Royale</p>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat">
+            <span class="stat-label">Time</span>
+            <span class="stat-value" id="stat-time">0.0s</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label" id="stat-secondary-label">Alive</span>
+            <span class="stat-value" id="stat-secondary">0</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Seed</span>
+            <span class="stat-value" id="stat-seed">—</span>
+          </div>
+        </div>
+
+        <div class="controls">
+          <button id="btn-play" class="btn btn-primary" type="button">Pause</button>
+          <div class="speed-group" role="group" aria-label="Simulation speed">
+            <button class="btn btn-speed" data-speed="1" type="button">1x</button>
+            <button class="btn btn-speed" data-speed="2" type="button">2x</button>
+            <button class="btn btn-speed" data-speed="4" type="button">4x</button>
+          </div>
+          <span class="control-sep"></span>
+          <button id="btn-rerun" class="btn" type="button">Rerun</button>
+          <button id="btn-new" class="btn" type="button">New match</button>
+          <span class="control-sep"></span>
+          <button id="btn-setup" class="btn" type="button">Setup</button>
+          <button id="btn-editor" class="btn" type="button">Map editor</button>
+        </div>
+      </header>
+
+      <main class="stage">
+        <div class="canvas-wrap">
+          <canvas id="arena" aria-label="Cube arena simulation"></canvas>
+
+          <div class="banner" id="banner" hidden>
+            <span id="banner-text"></span>
+          </div>
+
+          <div class="result" id="result" hidden>
+            <div class="result-card">
+              <p class="result-kicker" id="result-kicker">Winner</p>
+              <h2 id="result-name">—</h2>
+              <p class="result-detail" id="result-detail"></p>
+              <div class="result-actions">
+                <button id="btn-again" class="btn btn-primary" type="button">Run it again</button>
+                <button id="btn-result-setup" class="btn" type="button">Change setup</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="sidebar">
+          <section class="panel">
+            <h2 class="panel-title">Standings</h2>
+            <ol class="leaderboard" id="leaderboard"></ol>
+          </section>
+        </aside>
+      </main>
+    </div>
+
+    <div class="modal" id="setup" hidden>
+      <form class="modal-card" id="setup-form">
+        <h2>New match</h2>
+        <p class="modal-sub">Pick the rules, then let the cubes sort it out.</p>
+
+        <fieldset class="field">
+          <legend>Mode</legend>
+          <div class="mode-options">
+            <label class="mode-option">
+              <input type="radio" name="mode" value="battle" checked />
+              <span class="mode-body">
+                <strong>Battle Royale</strong>
+                <small>Cubes damage each other on impact. Last one alive wins.</small>
+              </span>
+            </label>
+            <label class="mode-option">
+              <input type="radio" name="mode" value="race" />
+              <span class="mode-body">
+                <strong>Race</strong>
+                <small>Cubes bounce toward the finish line. First across wins.</small>
+              </span>
+            </label>
+          </div>
+        </fieldset>
+
+        <div class="field-pair">
+          <div class="field">
+            <label for="input-count">Cubes <output id="out-count">8</output></label>
+            <input id="input-count" name="count" type="range" min="2" max="24" step="1" value="8" />
+          </div>
+
+          <div class="field">
+            <label for="input-speed">Speed <output id="out-speed">1.0x</output></label>
+            <input id="input-speed" name="speed" type="range" min="0.5" max="2.5" step="0.1" value="1" />
+          </div>
+        </div>
+
+        <div class="field-pair">
+          <div class="field">
+            <label for="input-cube-size">Cube size <output id="out-cube-size">32px</output></label>
+            <input id="input-cube-size" name="cube-size" type="range" min="12" max="72" step="2" value="32" />
+          </div>
+
+          <div class="field" id="field-hp">
+            <label for="input-hp">Starting HP <output id="out-hp">100</output></label>
+            <input id="input-hp" name="hp" type="range" min="50" max="300" step="10" value="100" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="input-arena">Arena</label>
+          <select id="input-arena" name="arena">
+            <option value="pillars" selected>Pillars (a few obstacles)</option>
+            <option value="open">Open (wide and empty)</option>
+            <option value="maze">Maze (tight and chaotic)</option>
+            <option value="corridors">Corridors (weaving lanes)</option>
+            <option value="rings">Rings (open middle, walled edges)</option>
+            <option value="grid">Grid (evenly scattered blocks)</option>
+          </select>
+        </div>
+
+        <div class="field field-row" id="field-battle-options">
+          <label class="checkbox">
+            <input type="checkbox" id="input-teams" name="teams" />
+            <span>Team mode</span>
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" id="input-collision-damage" name="collision-damage" checked />
+            <span>Collision damage</span>
+          </label>
+        </div>
+
+        <div class="field" id="field-team-count" hidden>
+          <label for="input-team-count">Teams <output id="out-team-count">2</output></label>
+          <input id="input-team-count" name="team-count" type="range" min="2" max="4" step="1" value="2" />
+        </div>
+
+        <div class="field field-row">
+          <label class="checkbox">
+            <input type="checkbox" id="input-powerups" name="powerups" checked />
+            <span>Spawn power-ups</span>
+          </label>
+        </div>
+
+        <div class="field">
+          <label for="input-seed">Seed <small>(blank for random)</small></label>
+          <div class="seed-row">
+            <input id="input-seed" name="seed" type="text" inputmode="numeric" placeholder="random" />
+            <div class="seed-actions">
+              <button type="button" class="btn" id="btn-find-seed">Find close seed</button>
+              <button type="button" class="btn" id="btn-find-lively-seed">Find lively seed</button>
+            </div>
+          </div>
+          <p class="seed-status" id="seed-status" hidden></p>
+          <label class="checkbox seed-preference">
+            <input type="checkbox" id="input-close-seeds" name="close-seeds" />
+            <span>Prefer close seeds for new matches</span>
+          </label>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn" id="btn-cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary">Start match</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="modal" id="editor" hidden>
+      <div class="editor-shell">
+        <header class="editor-top">
+          <div>
+            <h2>Map editor</h2>
+            <p class="modal-sub">
+              Draw walls, mark where cubes spawn, and place power-up pads. Saved maps show up in
+              Setup.
+            </p>
+          </div>
+          <button id="editor-done" class="btn" type="button">Close</button>
+        </header>
+
+        <div class="editor-body">
+          <aside class="editor-panel">
+            <div class="field">
+              <label for="editor-name">Map name</label>
+              <input id="editor-name" type="text" maxlength="40" placeholder="My arena" />
+            </div>
+
+            <fieldset class="field">
+              <legend>Tool</legend>
+              <div class="tool-grid">
+                <button type="button" class="btn tool" data-tool="wall">Wall</button>
+                <button type="button" class="btn tool" data-tool="breakable-wall">Breakable</button>
+                <button type="button" class="btn tool" data-tool="spawn">Spawn zone</button>
+                <button type="button" class="btn tool" data-tool="finish">Finish flag</button>
+                <button type="button" class="btn tool" data-tool="powerup">Power-up</button>
+                <button type="button" class="btn tool" data-tool="gun">Gun</button>
+                <button type="button" class="btn tool" data-tool="erase">Erase</button>
+              </div>
+            </fieldset>
+
+            <div class="field">
+              <label for="editor-direction">Wall movement</label>
+              <select id="editor-direction">
+                <option value="none" selected>Static</option>
+                <option value="right">Moves right</option>
+                <option value="left">Moves left</option>
+                <option value="up">Moves up</option>
+                <option value="down">Moves down</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="editor-wall-speed">
+                Wall speed <output id="editor-wall-speed-out">35</output>
+              </label>
+              <input id="editor-wall-speed" type="range" min="10" max="120" step="5" value="35" />
+            </div>
+
+            <div class="field" id="field-breakable-hits" hidden>
+              <label for="editor-breakable-hits">
+                Hits to break <output id="editor-breakable-hits-out">3</output>
+              </label>
+              <input id="editor-breakable-hits" type="range" min="1" max="20" step="1" value="3" />
+            </div>
+
+            <div class="field">
+              <label for="editor-gun">Gun type</label>
+              <select id="editor-gun">
+                <option value="pistol" selected>Pistol (steady)</option>
+                <option value="smg">SMG (fast, weak)</option>
+                <option value="shotgun">Shotgun (spread)</option>
+                <option value="sniper">Sniper (heavy)</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="editor-kind">Pad type</label>
+              <select id="editor-kind">
+                <option value="random" selected>Random</option>
+                <option value="heal">Heal</option>
+                <option value="rage">Rage</option>
+                <option value="speed">Speed</option>
+                <option value="shield">Shield</option>
+              </select>
+            </div>
+
+            <div class="field-pair">
+              <div class="field">
+                <label for="editor-width">Width <output id="editor-width-out">1200</output></label>
+                <input id="editor-width" type="range" min="800" max="3600" step="100" value="1200" />
+              </div>
+              <div class="field">
+                <label for="editor-height">Height <output id="editor-height-out">640</output></label>
+                <input id="editor-height" type="range" min="640" max="1200" step="40" value="640" />
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="editor-palette">Colours</label>
+              <select id="editor-palette">
+                <option value="pillars" selected>Magenta</option>
+                <option value="open">Blue</option>
+                <option value="maze">Green</option>
+                <option value="corridors">Ice</option>
+                <option value="rings">Desert</option>
+                <option value="grid">Twilight</option>
+              </select>
+            </div>
+
+            <div class="field field-row">
+              <label class="checkbox">
+                <input type="checkbox" id="editor-snap" checked />
+                <span>Snap to grid</span>
+              </label>
+            </div>
+
+            <div class="editor-actions">
+              <button id="editor-undo" class="btn" type="button">Undo</button>
+              <button id="editor-clear" class="btn" type="button">Clear</button>
+            </div>
+
+            <div class="field">
+              <label for="editor-load">Saved maps</label>
+              <select id="editor-load">
+                <option value="">— new map —</option>
+              </select>
+            </div>
+
+            <div class="editor-actions">
+              <button id="editor-save" class="btn btn-primary" type="button">Save map</button>
+              <button id="editor-delete" class="btn" type="button">Delete</button>
+            </div>
+
+            <div class="editor-actions">
+              <button id="editor-test-battle" class="btn" type="button">Test battle</button>
+              <button id="editor-test-race" class="btn" type="button">Test race</button>
+            </div>
+
+            <p class="editor-status" id="editor-status" role="status"></p>
+          </aside>
+
+          <div class="editor-stage">
+            <canvas id="editor-canvas" aria-label="Map editor canvas"></canvas>
+            <input
+              id="editor-scroll"
+              class="editor-scroll"
+              type="range"
+              min="0"
+              max="0"
+              value="0"
+              step="10"
+              aria-label="Scroll map horizontally"
+            />
+            <p class="editor-hint" id="editor-hint"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
