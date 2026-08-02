@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TowerWatch</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,500;6..72,650&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true"></div>
+          <div>
+            <p class="brand-name">TowerWatch</p>
+            <p class="brand-sub" id="towerLabel">Tower assist · waiting for feed</p>
+          </div>
+        </div>
+        <div class="status-pills">
+          <div class="pill" id="connPill">Connecting</div>
+          <div class="pill muted" id="trackPill">0 tracks</div>
+          <div class="pill muted" id="fpsPill">0 fps</div>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="feed-panel">
+          <div class="feed-frame">
+            <img id="liveFeed" alt="Live tower camera feed" />
+            <div class="feed-caption">
+              <span id="zoneLabel">Zone</span>
+              <span id="modeLabel">mode</span>
+            </div>
+          </div>
+          <p class="assist-note">
+            AI assist only — always confirm with eyes on the water before entering.
+          </p>
+        </section>
+
+        <aside class="alert-panel">
+          <div class="alert-header">
+            <h1>Distress alerts</h1>
+            <span class="open-count" id="openCount">0 open</span>
+          </div>
+          <div id="activeAlert" class="active-alert empty">
+            <p class="empty-title">No active distress</p>
+            <p class="empty-copy">
+              When the edge model holds a high score, the clip and reasons appear here.
+            </p>
+          </div>
+          <div class="list-header">Recent</div>
+          <div id="alertList" class="alert-list"></div>
+        </aside>
+      </main>
+    </div>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

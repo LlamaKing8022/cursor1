@@ -1,0 +1,36 @@
+tower:
+  id: tower-1
+  name: Tower 1
+  zone: "Main swim area"
+
+camera:
+  # "demo" generates synthetic beach scene with swimmers
+  # Or set source to 0 (webcam), rtsp://..., or path/to/video.mp4
+  source: demo
+  width: 1280
+  height: 720
+  fps: 12
+
+pipeline:
+  # Frames to keep for each tracked person when scoring distress
+  history_seconds: 8
+  # Raise alert when score stays above threshold this long
+  confirm_seconds: 3.0
+  score_threshold: 0.72
+  # Cooldown so one incident does not spam the tablet
+  alert_cooldown_seconds: 45
+  min_track_age_seconds: 2.0
+
+server:
+  host: 0.0.0.0
+  port: 8000
+  # Edge worker posts here
+  alert_url: http://127.0.0.1:8000/api/alerts
+  stream_url: http://127.0.0.1:8000/api/stream/frame
+
+demo:
+  # How many synthetic swimmers to draw
+  swimmers: 6
+  # Chance per second that one swimmer enters distress
+  # (~every 10–20s on average in the synthetic beach scene)
+  distress_chance_per_second: 0.08
