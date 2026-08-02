@@ -1,0 +1,1 @@
+"""Offline video analysis: upload footage, find distress events, label them."""

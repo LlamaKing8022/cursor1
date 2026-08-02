@@ -1,0 +1,69 @@
+tower:
+  id: tower-1
+  name: Tower 1
+  zone: "Main swim area"
+
+camera:
+  # "demo" generates a synthetic beach scene with swimmers.
+  # For a real tower camera use 0 (webcam), rtsp://..., or path/to/video.mp4
+  source: demo
+  width: 1280
+  height: 720
+  fps: 12
+
+pipeline:
+  # Frames to keep for each tracked person when scoring distress
+  history_seconds: 8
+  # Raise alert when score stays above threshold this long
+  confirm_seconds: 3.0
+  score_threshold: 0.72
+  # Cooldown so one incident does not spam the tablet
+  alert_cooldown_seconds: 45
+  min_track_age_seconds: 2.0
+
+server:
+  host: 0.0.0.0
+  port: 8000
+  # Edge worker posts here
+  alert_url: http://127.0.0.1:8000/api/alerts
+  stream_url: http://127.0.0.1:8000/api/stream/frame
+
+rip:
+  # Rip current segmentation (train with scripts/train_rip_model.py on RipVIS).
+  # Most ocean rescues happen in rips, so this doubles as an early warning:
+  # a swimmer sitting in a rip is flagged before any distress cue appears.
+  enabled: false
+  weights: models/rip_seg.pt
+  confidence: 0.25
+  interval_frames: 15
+  grid: 96
+  # Higher = steadier zones, slower to react to a new rip
+  smoothing: 0.9
+  risk_threshold: 0.45
+  advisory_seconds: 6
+  advisory_cooldown_seconds: 90
+  device: null
+  draw_overlay: true
+
+analysis:
+  # Detector for uploaded footage:
+  #   motion = background subtraction (best for fixed tower cams)
+  #   hog    = OpenCV person detector
+  #   yolo   = Ultralytics YOLO (pip install ultralytics)
+  detector: motion
+  # Frames per second actually analyzed (lower = faster)
+  target_fps: 10
+  # Longest frame edge used for analysis
+  max_dimension: 960
+  # Minimum gap between two events on the same swimmer
+  event_cooldown_seconds: 20
+  # Seconds of padding around each labeled training clip
+  clip_padding_seconds: 4
+  write_annotated_video: true
+
+demo:
+  # How many synthetic swimmers to draw
+  swimmers: 6
+  # Chance per second that one swimmer enters distress
+  # (~every 10–20s on average in the synthetic beach scene)
+  distress_chance_per_second: 0.08
