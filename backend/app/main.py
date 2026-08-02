@@ -27,7 +27,19 @@ DATA_DIR = ROOT / "data"
 
 ALLOWED_VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm", ".mpg", ".mpeg"}
 
-app = FastAPI(title="TowerWatch", version="0.2.0")
+APP_VERSION = "0.2.0"
+
+app = FastAPI(title="TowerWatch", version=APP_VERSION)
+
+
+@app.middleware("http")
+async def no_store_ui(request: Request, call_next):
+    """Keep the tablet UI from serving a cached build after an update."""
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-store, must-revalidate"
+    return response
 
 config = load_config()
 jobs = JobManager(DATA_DIR)
@@ -44,7 +56,9 @@ async def _bind_loop() -> None:
 
 @app.get("/api/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
-    return HealthResponse(ok=True, open_alerts=await store.open_count())
+    return HealthResponse(
+        ok=True, version=APP_VERSION, open_alerts=await store.open_count()
+    )
 
 
 @app.post("/api/alerts")

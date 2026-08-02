@@ -70,4 +70,5 @@ class TowerStatus(BaseModel):
 class HealthResponse(BaseModel):
     ok: bool
     service: str = "towerwatch"
+    version: str = "0.0.0"
     open_alerts: int

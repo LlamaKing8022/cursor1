@@ -16,6 +16,7 @@ const els = {
   zoneLabel: $("zoneLabel"),
   modeLabel: $("modeLabel"),
   connPill: $("connPill"),
+  versionPill: $("versionPill"),
   trackPill: $("trackPill"),
   fpsPill: $("fpsPill"),
   openCount: $("openCount"),
@@ -467,6 +468,13 @@ function refreshFeed() {
   if (els.viewLive.classList.contains("hidden")) return;
   els.liveFeed.src = `/api/stream/latest.jpg?t=${Date.now()}`;
 }
+
+fetch("/api/health")
+  .then((r) => r.json())
+  .then((h) => {
+    els.versionPill.textContent = `v${h.version}`;
+  })
+  .catch(() => {});
 
 connectWs();
 setInterval(refreshFeed, 350);
