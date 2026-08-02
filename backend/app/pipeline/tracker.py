@@ -27,8 +27,15 @@ class IoUTracker:
         self._next_id = 1
         self.tracks: dict[int, Track] = {}
 
-    def update(self, detections: list[Detection], history_seconds: float = 8.0) -> list[Track]:
-        now = time.time()
+    def update(
+        self,
+        detections: list[Detection],
+        history_seconds: float = 8.0,
+        now: float | None = None,
+    ) -> list[Track]:
+        # Offline video analysis passes video time so scoring matches the footage
+        # rather than wall-clock processing speed.
+        now = time.time() if now is None else now
         track_ids = list(self.tracks.keys())
         unmatched_tracks = set(track_ids)
         unmatched_dets = set(range(len(detections)))

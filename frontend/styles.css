@@ -121,6 +121,33 @@ body {
   font-weight: 500;
 }
 
+.tabs {
+  display: flex;
+  gap: 6px;
+  background: rgba(8, 21, 27, 0.45);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px;
+}
+
+.tab {
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 9px 16px;
+  font-weight: 600;
+}
+
+.tab.active {
+  background: rgba(216, 195, 161, 0.16);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px rgba(216, 195, 161, 0.28);
+}
+
+.hidden {
+  display: none !important;
+}
+
 .layout {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.9fr);
@@ -367,6 +394,224 @@ button.ghost {
   color: var(--muted);
 }
 
+/* ---------- video review ---------- */
+
+.review-main,
+.review-side {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.card {
+  background: rgba(10, 28, 36, 0.55);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+  padding: 18px;
+}
+
+.card h2 {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 650;
+}
+
+.card-copy {
+  margin: 0 0 14px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.card-copy code {
+  color: var(--sand);
+}
+
+.file-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 26px 16px;
+  border: 1.5px dashed rgba(216, 195, 161, 0.4);
+  border-radius: 16px;
+  background: rgba(18, 48, 64, 0.35);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.file-drop.hover {
+  border-color: var(--sand);
+  background: rgba(216, 195, 161, 0.12);
+}
+
+.file-drop-title {
+  font-weight: 600;
+  font-size: 1.02rem;
+  word-break: break-all;
+}
+
+.file-drop-hint {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.field select,
+.field input {
+  background: rgba(8, 21, 27, 0.6);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 9px 10px;
+  font: inherit;
+  font-size: 0.95rem;
+}
+
+.upload-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.upload-status {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.progress {
+  margin-top: 12px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(8, 21, 27, 0.6);
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--sea), var(--sand));
+  transition: width 0.25s ease;
+}
+
+.player-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.player-card video {
+  width: 100%;
+  border-radius: 14px;
+  background: #06121a;
+  display: block;
+  aspect-ratio: 16 / 9;
+}
+
+.event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 640px;
+  overflow: auto;
+}
+
+.event-card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 12px;
+  background: rgba(8, 21, 27, 0.4);
+}
+
+.event-card img {
+  width: 100%;
+  border-radius: 12px;
+  margin-bottom: 10px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: #06121a;
+}
+
+.label-actions {
+  margin-top: 8px;
+}
+
+.label-state {
+  margin-top: 6px;
+  color: var(--ok);
+  min-height: 16px;
+}
+
+.alert-card.selected {
+  border-color: rgba(216, 195, 161, 0.5);
+  background: rgba(216, 195, 161, 0.08);
+}
+
+.job-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.link {
+  color: var(--sand);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.label-summary {
+  color: var(--foam);
+  margin-bottom: 10px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.chip {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.tiny {
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+
 @media (max-width: 960px) {
   .layout {
     grid-template-columns: 1fr;
@@ -374,5 +619,9 @@ button.ghost {
 
   .alert-panel {
     min-height: auto;
+  }
+
+  .topbar {
+    flex-wrap: wrap;
   }
 }

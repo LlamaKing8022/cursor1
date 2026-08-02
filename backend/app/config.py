@@ -44,12 +44,22 @@ class DemoConfig(BaseModel):
     distress_chance_per_second: float = 0.04
 
 
+class AnalysisConfig(BaseModel):
+    detector: str = "motion"
+    target_fps: float = 10.0
+    max_dimension: int = 960
+    event_cooldown_seconds: float = 20.0
+    clip_padding_seconds: float = 4.0
+    write_annotated_video: bool = True
+
+
 class AppConfig(BaseModel):
     tower: TowerConfig = Field(default_factory=TowerConfig)
     camera: CameraConfig = Field(default_factory=CameraConfig)
     pipeline: PipelineConfig = Field(default_factory=PipelineConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)
     demo: DemoConfig = Field(default_factory=DemoConfig)
+    analysis: AnalysisConfig = Field(default_factory=AnalysisConfig)
 
 
 def load_config(path: str | Path | None = None) -> AppConfig:

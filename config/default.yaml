@@ -4,8 +4,8 @@ tower:
   zone: "Main swim area"
 
 camera:
-  # "demo" generates synthetic beach scene with swimmers
-  # Or set source to 0 (webcam), rtsp://..., or path/to/video.mp4
+  # "demo" generates a synthetic beach scene with swimmers.
+  # For a real tower camera use 0 (webcam), rtsp://..., or path/to/video.mp4
   source: demo
   width: 1280
   height: 720
@@ -27,6 +27,22 @@ server:
   # Edge worker posts here
   alert_url: http://127.0.0.1:8000/api/alerts
   stream_url: http://127.0.0.1:8000/api/stream/frame
+
+analysis:
+  # Detector for uploaded footage:
+  #   motion = background subtraction (best for fixed tower cams)
+  #   hog    = OpenCV person detector
+  #   yolo   = Ultralytics YOLO (pip install ultralytics)
+  detector: motion
+  # Frames per second actually analyzed (lower = faster)
+  target_fps: 10
+  # Longest frame edge used for analysis
+  max_dimension: 960
+  # Minimum gap between two events on the same swimmer
+  event_cooldown_seconds: 20
+  # Seconds of padding around each labeled training clip
+  clip_padding_seconds: 4
+  write_annotated_video: true
 
 demo:
   # How many synthetic swimmers to draw

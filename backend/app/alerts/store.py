@@ -35,6 +35,10 @@ class AlertStore:
         for queue in dead:
             self._subscribers.discard(queue)
 
+    async def publish(self, event: dict[str, Any]) -> None:
+        """Broadcast a non-alert event (e.g. video analysis progress) to clients."""
+        await self._broadcast(event)
+
     async def create_alert(self, payload: AlertCreate) -> Alert:
         async with self._lock:
             alert = Alert(**payload.model_dump())

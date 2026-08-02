@@ -58,6 +58,55 @@ Open **http://127.0.0.1:8000/** on a laptop/tablet.
 
 The demo draws a synthetic ocean scene with swimmers. Every so often one enters a distress pattern; after the score holds for a few seconds, an alert appears on the tablet.
 
+## Analyze real footage (upload a video)
+
+The demo scene is only for wiring things up. To work on real conditions, open the
+**Video review** tab and upload footage from a tower camera or a phone.
+
+1. Start the server (`./scripts/run_server.sh`) and open http://127.0.0.1:8000/
+2. Click **Video review**
+3. Drop in a video (`mp4`, `mov`, `avi`, `mkv`, `webm`) and press **Analyze video**
+4. Watch the annotated playback and step through each flagged moment
+5. Mark every flag **Real distress**, **False alarm**, or **Unsure**
+
+Analysis runs the same detect → track → score pipeline used live, so what you see in
+review is what the tower would have alerted on.
+
+### Detector choices for uploads
+
+| Detector | Best for | Notes |
+|----------|----------|-------|
+| `motion` | Fixed tower camera | Background subtraction; default, no model download |
+| `hog` | Upright bodies, shore/shallow | OpenCV person detector |
+| `yolo` | Best accuracy | Needs `pip install ultralytics` |
+
+Threshold and hold-time are adjustable per upload, so you can tune sensitivity against
+your own footage instead of guessing.
+
+### How labeling becomes training data
+
+Detection and training are separate steps. The rules ship with sensible defaults, but
+they only become beach-specific once they learn from your verdicts. Every label writes:
+
+- a row in `data/labels/labels.jsonl` (time range, score, cues, verdict, notes)
+- a padded clip in `data/labels/clips/<verdict>/` cut from the original video
+
+That gives you a labeled clip dataset — the input a supervised distress model needs.
+Export the log any time with **Export CSV** or `GET /api/labels/export.csv`.
+
+Aim for a mix: real rescues and near-misses, plus the false alarms (surfers, kids
+playing, waves) that a model must learn to ignore.
+
+### No footage yet?
+
+Generate a test clip with a scripted distress event:
+
+```bash
+python3 scripts/make_sample_video.py --seconds 70 --distress-at 12
+```
+
+Then upload `data/samples/sample_beach.mp4`.
+
 ## Use a real tower camera later
 
 Edit `config/default.yaml`:
@@ -80,11 +129,15 @@ Then restart the edge worker. For production accuracy, swap `HogPersonDetector` 
 ## Project layout
 
 ```text
-backend/app/          FastAPI server + alert store + pipeline library
-edge/worker.py        Camera loop that posts frames + alerts
-frontend/             Tower tablet UI
-config/default.yaml   Tower / camera / thresholds
-scripts/              run_server / run_edge / run_demo
+backend/app/pipeline/   Detectors, tracker, distress scoring
+backend/app/analysis/   Video upload analysis, annotated output, label store
+backend/app/alerts/     In-memory alert + status store
+backend/app/main.py     FastAPI routes and WebSocket
+edge/worker.py          Live camera loop that posts frames + alerts
+frontend/               Tower tablet UI (live + video review)
+config/default.yaml     Tower / camera / thresholds / analysis settings
+scripts/                run_server, run_edge, run_demo, make_sample_video, smoke_test
+data/                   uploads, analysis output, labels + training clips (gitignored)
 ```
 
 ## API (MVP)
@@ -98,7 +151,20 @@ scripts/              run_server / run_edge / run_demo
 | POST | `/api/alerts/{id}/status` | Acknowledge / respond / dismiss |
 | POST | `/api/stream/frame` | Edge uploads latest JPEG |
 | GET | `/api/stream/latest.jpg` | Tablet polls live frame |
-| WS | `/ws/alerts` | Live alert push |
+| POST | `/api/videos` | Upload footage and start analysis |
+| GET | `/api/analysis/jobs` | List analysis jobs |
+| GET | `/api/analysis/{id}/video` | Annotated review video |
+| GET | `/api/analysis/{id}/snapshots/{name}` | Event snapshot |
+| POST | `/api/analysis/{id}/events/{n}/label` | Save a verdict + training clip |
+| GET | `/api/labels/export.csv` | Export the label log |
+| WS | `/ws/alerts` | Live alerts + analysis progress |
+
+## Tests
+
+```bash
+python3 scripts/smoke_test.py          # includes an end-to-end video analysis check
+python3 scripts/smoke_test.py --fast   # skip the video test
+```
 
 ## Next upgrades
 

@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Offline smoke test for tracker + distress scoring (no server required)."""
+"""Offline smoke test for tracker, distress scoring, and video analysis."""
 
 from __future__ import annotations
 
+import argparse
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -48,8 +50,53 @@ def test_tracker_keeps_id() -> None:
     assert a[0].track_id == b[0].track_id
 
 
+def test_video_analysis_finds_event() -> None:
+    """Render a short clip with a struggling swimmer and confirm analysis flags it."""
+    from backend.app.analysis.video import analyze_video
+    from backend.app.analysis.writer import AnnotatedVideoWriter
+    from backend.app.pipeline.demo_scene import DemoBeachScene
+
+    fps, seconds, width, height = 15.0, 40.0, 640, 360
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        video_path = tmp_path / "clip.mp4"
+        scene = DemoBeachScene(width, height, swimmers=5)
+        writer = AnnotatedVideoWriter(video_path, width, height, fps)
+        dt = 1.0 / fps
+        triggered = False
+        try:
+            for frame_index in range(int(seconds * fps)):
+                if not triggered and frame_index * dt >= 8.0:
+                    scene.force_distress()
+                    triggered = True
+                detections = scene.step(dt, distress_chance_per_second=0.0)
+                writer.write(scene.render(detections))
+        finally:
+            writer.close()
+
+        result = analyze_video(
+            video_path=video_path,
+            output_dir=tmp_path / "out",
+            detector_mode="motion",
+            target_fps=8.0,
+            write_annotated=False,
+        )
+        assert result.events, "expected at least one distress event"
+        event = result.events[0]
+        assert event.peak_score >= 0.72, event
+        assert event.start_time > 8.0, event
+
+
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--fast", action="store_true", help="skip the slower video analysis test"
+    )
+    args = parser.parse_args()
+
     test_traveling_swimmer_low_score()
     test_distress_pattern_high_score()
     test_tracker_keeps_id()
+    if not args.fast:
+        test_video_analysis_finds_event()
     print("smoke_test: OK")

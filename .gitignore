@@ -4,8 +4,12 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 .mypy_cache/
-data/samples/*.mp4
-*.jpg
-*.jpeg
+
+# Generated footage, analysis output, and label data
+data/uploads/
+data/analysis/
+data/labels/
+data/samples/
+
 .DS_Store
 .env
