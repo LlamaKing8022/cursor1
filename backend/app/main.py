@@ -14,6 +14,7 @@ from .alerts.store import store
 from .analysis.jobs import JobManager
 from .analysis.labels import LabelStore
 from .config import load_config
+from .placeholders import placeholder_frame_jpeg
 from .models.schemas import (
     AlertCreate,
     AlertStatusUpdate,
@@ -27,7 +28,7 @@ DATA_DIR = ROOT / "data"
 
 ALLOWED_VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm", ".mpg", ".mpeg"}
 
-APP_VERSION = "0.2.0"
+APP_VERSION = "0.3.0"
 
 app = FastAPI(title="TowerWatch", version=APP_VERSION)
 
@@ -56,8 +57,20 @@ async def _bind_loop() -> None:
 
 @app.get("/api/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
+    async with _latest_lock:
+        has_frame = _latest_jpeg is not None
+    status = await store.get_tower_status()
+    edge_connected = status is not None and status.camera_ok
+    hint = ""
+    if not has_frame:
+        hint = "Server is up. Start the camera with ./scripts/run_demo.sh or ./scripts/run_edge.sh"
     return HealthResponse(
-        ok=True, version=APP_VERSION, open_alerts=await store.open_count()
+        ok=True,
+        version=APP_VERSION,
+        open_alerts=await store.open_count(),
+        has_live_frame=has_frame,
+        edge_connected=edge_connected,
+        hint=hint,
     )
 
 
@@ -88,9 +101,19 @@ async def update_tower_status(payload: TowerStatus):
 @app.get("/api/tower/status")
 async def get_tower_status():
     status = await store.get_tower_status()
-    if not status:
-        raise HTTPException(status_code=404, detail="No tower status yet")
-    return status
+    if status:
+        return status
+    return TowerStatus(
+        tower_id=config.tower.id,
+        tower_name=config.tower.name,
+        zone=config.tower.zone,
+        camera_ok=False,
+        tracks=0,
+        fps=0.0,
+        pipeline_mode="idle",
+        rip_enabled=config.rip.enabled,
+        rip_coverage=0.0,
+    )
 
 
 @app.post("/api/stream/frame")
@@ -107,7 +130,11 @@ async def latest_frame():
     async with _latest_lock:
         data = _latest_jpeg
     if not data:
-        raise HTTPException(status_code=404, detail="No frame yet")
+        return Response(
+            content=placeholder_frame_jpeg(),
+            media_type="image/jpeg",
+            headers={"X-TowerWatch-Placeholder": "1"},
+        )
     return Response(content=data, media_type="image/jpeg")
 
 
@@ -293,6 +320,12 @@ async def alerts_ws(websocket: WebSocket):
         pass
     finally:
         store.unsubscribe(queue)
+
+
+@app.get("/favicon.ico")
+async def favicon():
+    # Avoid noisy 404s in the browser console
+    return Response(status_code=204)
 
 
 @app.get("/", response_class=HTMLResponse)

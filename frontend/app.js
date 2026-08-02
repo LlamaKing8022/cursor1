@@ -491,8 +491,16 @@ fetch("/api/health")
   .then((r) => r.json())
   .then((h) => {
     els.versionPill.textContent = `v${h.version}`;
+    if (!h.has_live_frame && h.hint) {
+      els.towerLabel.textContent = h.hint;
+      els.modeLabel.textContent = "camera idle";
+    }
   })
-  .catch(() => {});
+  .catch(() => {
+    els.towerLabel.textContent = "Cannot reach server — is ./scripts/run_server.sh running?";
+    els.connPill.textContent = "Offline";
+    els.connPill.className = "pill bad";
+  });
 
 connectWs();
 setInterval(refreshFeed, 350);

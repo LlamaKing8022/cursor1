@@ -58,6 +58,29 @@ Open **http://127.0.0.1:8000/** on a laptop/tablet.
 
 The demo draws a synthetic ocean scene with swimmers. Every so often one enters a distress pattern; after the score holds for a few seconds, an alert appears on the tablet.
 
+### Troubleshooting 404s
+
+If the browser or devtools show lots of **404** responses:
+
+1. **Wrong branch** — `main` only has a README. You need:
+   ```bash
+   git checkout cursor/tower-drowning-mvp-5351
+   git pull
+   ```
+2. **Server not running** — start it from the project folder:
+   ```bash
+   source .venv/bin/activate
+   ./scripts/run_demo.sh
+   ```
+3. **Only the API is running** — `./scripts/run_server.sh` alone is fine for **Video review**, but the live feed needs `./scripts/run_edge.sh` or `./scripts/run_demo.sh`.
+4. **Run the doctor**:
+   ```bash
+   ./scripts/doctor.sh
+   ```
+5. Check **http://127.0.0.1:8000/api/health** — should return JSON with `"version": "0.3.0"`.
+
+Hard-refresh the page: **Cmd+Shift+R** (Mac) or **Ctrl+Shift+R** (Windows/Linux).
+
 ## Analyze real footage (upload a video)
 
 The demo scene is only for wiring things up. To work on real conditions, open the

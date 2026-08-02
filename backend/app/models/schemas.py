@@ -81,3 +81,6 @@ class HealthResponse(BaseModel):
     service: str = "towerwatch"
     version: str = "0.0.0"
     open_alerts: int
+    has_live_frame: bool = False
+    edge_connected: bool = False
+    hint: str = ""
