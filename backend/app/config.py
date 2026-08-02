@@ -44,6 +44,22 @@ class DemoConfig(BaseModel):
     distress_chance_per_second: float = 0.04
 
 
+class RipConfig(BaseModel):
+    enabled: bool = False
+    weights: str = "models/rip_seg.pt"
+    confidence: float = 0.25
+    # Rips change over minutes, so segmentation need not run every frame
+    interval_frames: int = 15
+    grid: int = 96
+    smoothing: float = 0.9
+    risk_threshold: float = 0.45
+    # Seconds a swimmer must remain in a rip before an advisory is raised
+    advisory_seconds: float = 6.0
+    advisory_cooldown_seconds: float = 90.0
+    device: str | None = None
+    draw_overlay: bool = True
+
+
 class AnalysisConfig(BaseModel):
     detector: str = "motion"
     target_fps: float = 10.0
@@ -60,6 +76,11 @@ class AppConfig(BaseModel):
     server: ServerConfig = Field(default_factory=ServerConfig)
     demo: DemoConfig = Field(default_factory=DemoConfig)
     analysis: AnalysisConfig = Field(default_factory=AnalysisConfig)
+    rip: RipConfig = Field(default_factory=RipConfig)
+
+    def rip_weights_path(self) -> Path:
+        weights = Path(self.rip.weights)
+        return weights if weights.is_absolute() else ROOT / weights
 
 
 def load_config(path: str | Path | None = None) -> AppConfig:

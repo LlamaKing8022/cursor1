@@ -38,3 +38,4 @@ class Track:
 class DistressResult:
     score: float
     reasons: list[str]
+    rip_risk: float = 0.0

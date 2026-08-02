@@ -9,6 +9,7 @@ import numpy as np
 
 from ..pipeline.detector import build_detector
 from ..pipeline.distress import score_distress
+from ..pipeline.rip import build_rip_segmenter, draw_rip_overlay
 from ..pipeline.tracker import IoUTracker
 
 
@@ -22,6 +23,7 @@ class DistressEvent:
     reasons: list[str]
     bbox: dict[str, float]
     snapshot: str = ""
+    rip_risk: float = 0.0
 
     @property
     def duration(self) -> float:
@@ -38,6 +40,7 @@ class DistressEvent:
             "reasons": self.reasons,
             "bbox": self.bbox,
             "snapshot": self.snapshot,
+            "rip_risk": round(self.rip_risk, 3),
         }
 
 
@@ -104,6 +107,7 @@ def analyze_video(
     min_track_age_seconds: float = 2.0,
     event_cooldown_seconds: float = 20.0,
     write_annotated: bool = True,
+    rip_options: dict | None = None,
     progress_cb: Callable[[float, str], None] | None = None,
 ) -> AnalysisResult:
     """Run the tower pipeline over an uploaded video and return distress events."""
@@ -136,6 +140,11 @@ def analyze_video(
     detector = build_detector(detector_mode)
     tracker = IoUTracker()
 
+    rip_options = dict(rip_options or {})
+    rip_threshold = float(rip_options.pop("risk_threshold", 0.45))
+    rip_draw = bool(rip_options.pop("draw_overlay", True))
+    rip_segmenter = build_rip_segmenter(**rip_options) if rip_options else None
+
     writer: AnnotatedVideoWriter | None = None
     if write_annotated:
         writer = AnnotatedVideoWriter(
@@ -167,9 +176,12 @@ def analyze_video(
                 detections, history_seconds=history_seconds, now=video_time
             )
 
+            zones = rip_segmenter.process(frame) if rip_segmenter else None
+
             scores: dict[int, float] = {}
             for track in tracks:
-                result = score_distress(track, fps=processed_fps)
+                rip_risk = zones.risk_at(track.cx, track.cy) if zones else 0.0
+                result = score_distress(track, fps=processed_fps, rip_risk=rip_risk)
                 scores[track.track_id] = result.score
                 age_seconds = track.age_frames / max(processed_fps, 1e-3)
 
@@ -186,6 +198,7 @@ def analyze_video(
                         if result.score > active.peak_score:
                             active.peak_score = result.score
                             active.reasons = result.reasons
+                            active.rip_risk = rip_risk
                     elif held >= confirm_seconds and (
                         video_time - last_event_at.get(track.track_id, -1e9)
                         >= event_cooldown_seconds
@@ -203,8 +216,11 @@ def analyze_video(
                                 "w": round(track.w, 4),
                                 "h": round(track.h, 4),
                             },
+                            rip_risk=rip_risk,
                         )
                         snapshot = _draw(frame, [track], scores, score_threshold)
+                        if zones and rip_draw:
+                            snapshot = draw_rip_overlay(snapshot, zones, rip_threshold)
                         snap_name = f"event_{event.index:03d}.jpg"
                         cv2.imwrite(
                             str(snapshots_dir / snap_name),
@@ -226,7 +242,10 @@ def analyze_video(
                     open_event.pop(tid, None)
 
             if writer:
-                writer.write(_draw(frame, tracks, scores, score_threshold))
+                annotated = _draw(frame, tracks, scores, score_threshold)
+                if zones and rip_draw:
+                    annotated = draw_rip_overlay(annotated, zones, rip_threshold)
+                writer.write(annotated)
 
             processed += 1
             if progress_cb and total_frames > 0:

@@ -250,6 +250,20 @@ body {
   background: rgba(18, 48, 64, 0.35);
 }
 
+.active-alert.advisory {
+  border-color: rgba(224, 164, 92, 0.45);
+  background: linear-gradient(180deg, rgba(224, 164, 92, 0.16), rgba(18, 48, 64, 0.4));
+}
+
+.active-alert.advisory .score {
+  color: var(--warn);
+}
+
+.pill.rip {
+  border-color: rgba(224, 164, 92, 0.45);
+  color: var(--warn);
+}
+
 .empty-title {
   margin: 28px 0 8px;
   font-family: var(--font-display);

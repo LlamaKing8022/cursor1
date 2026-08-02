@@ -17,6 +17,7 @@ const els = {
   modeLabel: $("modeLabel"),
   connPill: $("connPill"),
   versionPill: $("versionPill"),
+  ripPill: $("ripPill"),
   trackPill: $("trackPill"),
   fpsPill: $("fpsPill"),
   openCount: $("openCount"),
@@ -96,20 +97,26 @@ function renderActive() {
     return;
   }
 
-  els.activeAlert.className = "active-alert";
+  const isRip = alert.kind === "rip_advisory";
+  els.activeAlert.className = `active-alert${isRip ? " advisory" : ""}`;
   const img = alert.frame_jpeg_b64
     ? `<img alt="Alert snapshot" src="data:image/jpeg;base64,${alert.frame_jpeg_b64}" />`
     : "";
   const reasons = (alert.reasons || []).map((r) => `<li>${r}</li>`).join("");
+  const heading = isRip ? "Rip current advisory" : "Possible distress";
 
   els.activeAlert.innerHTML = `
     ${img}
     <div class="meta-row">
       <div>
-        <strong>Track #${alert.track_id}</strong>
+        <strong>${heading} · track #${alert.track_id}</strong>
         <div class="tiny">${alert.zone || "Zone"} · ${fmtTime(alert.created_at)}</div>
       </div>
-      <div class="score">${Math.round(alert.score * 100)}% score</div>
+      <div class="score">${
+        isRip
+          ? `rip ${Math.round((alert.rip_risk || 0) * 100)}%`
+          : `${Math.round(alert.score * 100)}% score`
+      }</div>
     </div>
     <ul class="reasons">${reasons}</ul>
     <div class="actions">
@@ -128,13 +135,18 @@ function renderAlertList() {
   els.alertList.innerHTML = "";
   state.alerts.slice(0, 30).forEach((alert) => {
     const card = document.createElement("div");
+    const isRip = alert.kind === "rip_advisory";
     card.className = "alert-card";
     card.innerHTML = `
       <div class="row">
-        <strong>Track #${alert.track_id}</strong>
+        <strong>${isRip ? "Rip" : "Distress"} · #${alert.track_id}</strong>
         <span class="badge ${alert.status}">${alert.status}</span>
       </div>
-      <div class="tiny">${fmtTime(alert.created_at)} · score ${alert.score.toFixed(2)}</div>`;
+      <div class="tiny">${fmtTime(alert.created_at)} · ${
+        isRip
+          ? `rip risk ${(alert.rip_risk || 0).toFixed(2)}`
+          : `score ${alert.score.toFixed(2)}`
+      }</div>`;
     card.addEventListener("click", () => {
       state.selectedId = alert.id;
       renderActive();
@@ -152,6 +164,12 @@ function renderStatus() {
   els.modeLabel.textContent = `source: ${s.pipeline_mode}`;
   els.trackPill.textContent = `${s.tracks} tracks`;
   els.fpsPill.textContent = `${s.fps} fps`;
+  if (s.rip_enabled) {
+    els.ripPill.classList.remove("hidden");
+    els.ripPill.textContent = `rip zones ${Math.round((s.rip_coverage || 0) * 100)}%`;
+  } else {
+    els.ripPill.classList.add("hidden");
+  }
 }
 
 /* ---------- video review view ---------- */

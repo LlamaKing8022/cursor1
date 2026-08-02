@@ -8,3 +8,7 @@ httpx==0.28.1
 python-multipart==0.0.20
 PyYAML==6.0.2
 aiofiles==24.1.0
+huggingface_hub>=0.34.0
+
+# Optional — only needed for YOLO person detection and RipVIS rip segmentation:
+#   pip install ultralytics

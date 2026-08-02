@@ -10,6 +10,15 @@ data/uploads/
 data/analysis/
 data/labels/
 data/samples/
+data/ripvis/
+
+# Trained models and Ultralytics run artifacts
+models/*
+!models/README.md
+!models/.gitkeep
+runs/
+*.pt
 
 .DS_Store
 .env
+Ultralytics/

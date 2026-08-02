@@ -159,6 +159,17 @@ async def upload_video(
         "min_track_age_seconds": config.pipeline.min_track_age_seconds,
         "event_cooldown_seconds": config.analysis.event_cooldown_seconds,
         "write_annotated": write_annotated,
+        "rip_options": {
+            "enabled": config.rip.enabled,
+            "weights": str(config.rip_weights_path()),
+            "confidence": config.rip.confidence,
+            "interval_frames": config.rip.interval_frames,
+            "grid": config.rip.grid,
+            "smoothing": config.rip.smoothing,
+            "device": config.rip.device,
+            "risk_threshold": config.rip.risk_threshold,
+            "draw_overlay": config.rip.draw_overlay,
+        },
     }
     job = jobs.submit(dest, options)
     return job.to_dict()

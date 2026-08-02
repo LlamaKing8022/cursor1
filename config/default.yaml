@@ -28,6 +28,23 @@ server:
   alert_url: http://127.0.0.1:8000/api/alerts
   stream_url: http://127.0.0.1:8000/api/stream/frame
 
+rip:
+  # Rip current segmentation (train with scripts/train_rip_model.py on RipVIS).
+  # Most ocean rescues happen in rips, so this doubles as an early warning:
+  # a swimmer sitting in a rip is flagged before any distress cue appears.
+  enabled: false
+  weights: models/rip_seg.pt
+  confidence: 0.25
+  interval_frames: 15
+  grid: 96
+  # Higher = steadier zones, slower to react to a new rip
+  smoothing: 0.9
+  risk_threshold: 0.45
+  advisory_seconds: 6
+  advisory_cooldown_seconds: 90
+  device: null
+  draw_overlay: true
+
 analysis:
   # Detector for uploaded footage:
   #   motion = background subtraction (best for fixed tower cams)

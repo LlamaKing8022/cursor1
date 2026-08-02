@@ -32,10 +32,17 @@ class DemoBeachScene:
     offline video files written faster than real time.
     """
 
-    def __init__(self, width: int = 1280, height: int = 720, swimmers: int = 6) -> None:
+    def __init__(
+        self,
+        width: int = 1280,
+        height: int = 720,
+        swimmers: int = 6,
+        seed: int | None = None,
+    ) -> None:
         self.width = width
         self.height = height
         self.clock = 0.0
+        self._rng = random.Random(seed)
         self.swimmers = [
             self._spawn(i + 1, force_style="surf" if i == 0 else "swim")
             for i in range(swimmers)
@@ -44,23 +51,25 @@ class DemoBeachScene:
 
     def _spawn(self, swimmer_id: int, force_style: str | None = None) -> DemoSwimmer:
         style = force_style or "swim"
-        y = random.uniform(0.42, 0.82)
+        y = self._rng.uniform(0.42, 0.82)
         if style == "surf":
             return DemoSwimmer(
                 swimmer_id=swimmer_id,
-                x=random.uniform(0.05, 0.2),
+                x=self._rng.uniform(0.05, 0.2),
                 y=y,
-                vx=random.uniform(0.045, 0.07),
+                vx=self._rng.uniform(0.045, 0.07),
                 style="surf",
+                phase=self._rng.random() * math.tau,
                 w=0.05,
                 h=0.03,
             )
         return DemoSwimmer(
             swimmer_id=swimmer_id,
-            x=random.uniform(0.1, 0.85),
+            x=self._rng.uniform(0.1, 0.85),
             y=y,
-            vx=random.uniform(0.012, 0.028) * random.choice([-1, 1]),
+            vx=self._rng.uniform(0.012, 0.028) * self._rng.choice([-1, 1]),
             style="swim",
+            phase=self._rng.random() * math.tau,
             w=0.03,
             h=0.045,
         )
@@ -70,10 +79,10 @@ class DemoBeachScene:
         candidates = [s for s in self.swimmers if s.style == "swim"]
         if not candidates:
             return None
-        victim = random.choice(candidates)
+        victim = self._rng.choice(candidates)
         victim.style = "distress"
         victim.since = self.clock
-        victim.vx = random.uniform(-0.004, 0.004)
+        victim.vx = self._rng.uniform(-0.004, 0.004)
         victim.w = 0.028
         victim.h = 0.07
         return victim
@@ -82,7 +91,7 @@ class DemoBeachScene:
         if self.clock < self._next_distress_check:
             return
         self._next_distress_check = self.clock + 1.0
-        if random.random() < chance_per_second:
+        if self._rng.random() < chance_per_second:
             self.force_distress()
 
     def step(self, dt: float, distress_chance_per_second: float = 0.04) -> list[Detection]:
@@ -105,7 +114,7 @@ class DemoBeachScene:
                 w, h = swimmer.w, swimmer.h
                 if swimmer.x > 1.05:
                     swimmer.x = -0.05
-                    swimmer.y = random.uniform(0.45, 0.75)
+                    swimmer.y = self._rng.uniform(0.45, 0.75)
             else:
                 swimmer.x += swimmer.vx * dt
                 swimmer.y += math.sin(now * 1.3 + swimmer.phase) * 0.0015
@@ -117,7 +126,7 @@ class DemoBeachScene:
             # Recover distress after a while so demos keep cycling
             if swimmer.style == "distress" and now - swimmer.since > 18:
                 swimmer.style = "swim"
-                swimmer.vx = random.uniform(0.012, 0.028) * random.choice([-1, 1])
+                swimmer.vx = self._rng.uniform(0.012, 0.028) * self._rng.choice([-1, 1])
                 swimmer.w, swimmer.h = 0.03, 0.045
 
             swimmer.y = min(max(swimmer.y, 0.38), 0.9)

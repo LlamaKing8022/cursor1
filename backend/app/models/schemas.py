@@ -25,6 +25,9 @@ class TrackSnapshot(BaseModel):
     reasons: list[str] = Field(default_factory=list)
 
 
+AlertKind = Literal["distress", "rip_advisory"]
+
+
 class AlertCreate(BaseModel):
     tower_id: str
     tower_name: str = "Tower"
@@ -35,6 +38,8 @@ class AlertCreate(BaseModel):
     bbox: BoundingBox
     frame_jpeg_b64: str | None = None
     note: str = ""
+    kind: AlertKind = "distress"
+    rip_risk: float = 0.0
 
 
 class Alert(BaseModel):
@@ -49,6 +54,8 @@ class Alert(BaseModel):
     bbox: BoundingBox
     frame_jpeg_b64: str | None = None
     note: str = ""
+    kind: AlertKind = "distress"
+    rip_risk: float = 0.0
     status: Literal["open", "acknowledged", "dismissed", "responding"] = "open"
 
 
@@ -65,6 +72,8 @@ class TowerStatus(BaseModel):
     fps: float
     last_frame_at: datetime | None = None
     pipeline_mode: str = "demo"
+    rip_enabled: bool = False
+    rip_coverage: float = 0.0
 
 
 class HealthResponse(BaseModel):

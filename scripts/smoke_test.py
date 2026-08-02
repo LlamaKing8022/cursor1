@@ -50,17 +50,93 @@ def test_tracker_keeps_id() -> None:
     assert a[0].track_id == b[0].track_id
 
 
+def _rip_track(track_id: int, offshore: bool) -> Track:
+    """Track that travels steadily — offshore (seaward) or along the beach."""
+    track = Track(track_id=track_id, x=0.5, y=0.7, w=0.03, h=0.045)
+    t0 = time.time() - 6
+    for i in range(24):
+        if offshore:
+            # Camera looks out to sea, so seaward drift means decreasing y
+            x, y = 0.5 + i * 0.002, 0.70 - i * 0.006
+        else:
+            x, y = 0.2 + i * 0.02, 0.70
+        track.history.append((t0 + i * 0.25, x, y, 0.03, 0.045))
+    return track
+
+
+def test_rip_zone_map_smoothing_and_sampling() -> None:
+    import numpy as np
+
+    from backend.app.pipeline.rip import RipZoneMap
+
+    zones = RipZoneMap(grid=64, smoothing=0.5)
+    assert zones.risk_at(0.5, 0.5) == 0.0, "no updates yet means no risk"
+
+    mask = np.zeros((100, 100), dtype=np.float32)
+    mask[40:60, 40:60] = 1.0  # rip patch in the middle
+    for _ in range(12):
+        zones.update(mask)
+
+    inside = zones.risk_at(0.5, 0.5)
+    outside = zones.risk_at(0.05, 0.05)
+    assert inside > 0.8, inside
+    assert outside < 0.2, outside
+
+    # A single clean frame must not immediately erase a persistent rip
+    zones.update(np.zeros((100, 100), dtype=np.float32))
+    assert zones.risk_at(0.5, 0.5) > 0.3, "smoothing should resist one-frame dropout"
+    assert 0.0 < zones.coverage(0.3) < 1.0
+
+
+def test_rip_risk_escalates_offshore_drift() -> None:
+    """A swimmer swept seaward in a rip must not be dismissed as a strong swimmer."""
+    calm = score_distress(_rip_track(31, offshore=True), fps=12, rip_risk=0.0)
+    in_rip = score_distress(_rip_track(32, offshore=True), fps=12, rip_risk=0.9)
+    assert in_rip.score > calm.score, (calm, in_rip)
+    assert any("rip" in r for r in in_rip.reasons), in_rip.reasons
+    assert any("offshore" in r for r in in_rip.reasons), in_rip.reasons
+
+    # Someone swimming along the beach outside a rip stays low
+    alongshore = score_distress(_rip_track(33, offshore=False), fps=12, rip_risk=0.0)
+    assert alongshore.score < 0.5, alongshore
+
+
+def test_rip_exposure_monitor_advisory() -> None:
+    from backend.app.pipeline.distress import RipExposureMonitor
+
+    monitor = RipExposureMonitor(advisory_seconds=5.0, cooldown_seconds=60.0)
+    assert monitor.update(1, 0.9, now=0.0) is None, "needs to persist first"
+    assert monitor.update(1, 0.9, now=3.0) is None
+    held = monitor.update(1, 0.9, now=6.0)
+    assert held is not None and held >= 5.0, held
+    assert monitor.update(1, 0.9, now=7.0) is None, "cooldown should suppress repeats"
+
+    # Leaving the rip resets exposure
+    assert monitor.update(2, 0.9, now=0.0) is None
+    assert monitor.update(2, 0.1, now=3.0) is None
+    assert monitor.update(2, 0.9, now=4.0) is None
+    assert monitor.update(2, 0.9, now=10.0) is not None
+
+
+def test_rip_segmenter_absent_weights_disables_cleanly() -> None:
+    from backend.app.pipeline.rip import build_rip_segmenter
+
+    assert build_rip_segmenter(enabled=False, weights="models/nope.pt") is None
+    assert build_rip_segmenter(enabled=True, weights="/tmp/definitely-missing.pt") is None
+
+
 def test_video_analysis_finds_event() -> None:
     """Render a short clip with a struggling swimmer and confirm analysis flags it."""
     from backend.app.analysis.video import analyze_video
     from backend.app.analysis.writer import AnnotatedVideoWriter
     from backend.app.pipeline.demo_scene import DemoBeachScene
 
-    fps, seconds, width, height = 15.0, 40.0, 640, 360
+    fps, seconds, width, height = 15.0, 45.0, 640, 360
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
         video_path = tmp_path / "clip.mp4"
-        scene = DemoBeachScene(width, height, swimmers=5)
+        # Seeded so motion detection + distress placement stay reproducible.
+        scene = DemoBeachScene(width, height, swimmers=5, seed=7)
         writer = AnnotatedVideoWriter(video_path, width, height, fps)
         dt = 1.0 / fps
         triggered = False
@@ -80,6 +156,7 @@ def test_video_analysis_finds_event() -> None:
             detector_mode="motion",
             target_fps=8.0,
             write_annotated=False,
+            confirm_seconds=2.5,
         )
         assert result.events, "expected at least one distress event"
         event = result.events[0]
@@ -97,6 +174,10 @@ if __name__ == "__main__":
     test_traveling_swimmer_low_score()
     test_distress_pattern_high_score()
     test_tracker_keeps_id()
+    test_rip_zone_map_smoothing_and_sampling()
+    test_rip_risk_escalates_offshore_drift()
+    test_rip_exposure_monitor_advisory()
+    test_rip_segmenter_absent_weights_disables_cleanly()
     if not args.fast:
         test_video_analysis_finds_event()
     print("smoke_test: OK")

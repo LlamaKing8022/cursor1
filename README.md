@@ -129,15 +129,16 @@ Then restart the edge worker. For production accuracy, swap `HogPersonDetector` 
 ## Project layout
 
 ```text
-backend/app/pipeline/   Detectors, tracker, distress scoring
+backend/app/pipeline/   Detectors, tracker, distress scoring, rip zones
 backend/app/analysis/   Video upload analysis, annotated output, label store
 backend/app/alerts/     In-memory alert + status store
 backend/app/main.py     FastAPI routes and WebSocket
 edge/worker.py          Live camera loop that posts frames + alerts
 frontend/               Tower tablet UI (live + video review)
-config/default.yaml     Tower / camera / thresholds / analysis settings
-scripts/                run_server, run_edge, run_demo, make_sample_video, smoke_test
-data/                   uploads, analysis output, labels + training clips (gitignored)
+config/default.yaml     Tower / camera / thresholds / rip / analysis settings
+models/                 Install rip_seg.pt here after training
+scripts/                run_*, make_sample_video, fetch/prepare/train RipVIS, smoke_test
+data/                   uploads, analysis, labels, ripvis download (gitignored)
 ```
 
 ## API (MVP)
@@ -166,10 +167,65 @@ python3 scripts/smoke_test.py          # includes an end-to-end video analysis c
 python3 scripts/smoke_test.py --fast   # skip the video test
 ```
 
+## Rip current detection (RipVIS)
+
+Most open-water rescues happen in rips. TowerWatch can overlay likely rip zones
+and raise a **preventive advisory** when a swimmer stays inside one — before any
+distress cue appears. That model is trained on **[RipVIS](https://huggingface.co/datasets/Irikos/RipVIS)**
+(Dumitriu et al., CVPR 2025).
+
+### License first
+
+RipVIS is **CC BY-NC 4.0** with extra conditions: non-commercial, attribution
+required, no full-dataset redistribution. Cite Dumitriu et al., CVPR 2025 if you
+publish results. For commercial use contact the authors.
+
+### One-time setup
+
+```bash
+# 1. Optional dependency for YOLO segmentation
+pip install ultralytics
+
+# 2. Download RipVIS (images ~8 GB for train+val; annotations-only is a few MB)
+python3 scripts/fetch_ripvis.py                  # full train+val images
+# python3 scripts/fetch_ripvis.py --annotations-only   # dry run
+# python3 scripts/fetch_ripvis.py --videos             # also full videos (huge)
+
+# 3. Convert to an Ultralytics YOLO-seg dataset
+python3 scripts/prepare_ripvis.py
+
+# 4. Train and install weights at models/rip_seg.pt
+python3 scripts/train_rip_model.py               # GPU strongly recommended
+# python3 scripts/train_rip_model.py --device cpu --epochs 5   # smoke train only
+
+# 5. Turn it on
+```
+
+In `config/default.yaml`:
+
+```yaml
+rip:
+  enabled: true
+  weights: models/rip_seg.pt
+```
+
+Restart the edge worker / server. Live and video-review feeds will tint rip zones
+and can raise `rip_advisory` alerts when a tracked swimmer stays inside one.
+
+### How it plugs into distress scoring
+
+- Swimmers inside a rip get a score boost.
+- Being *carried seaward* in a rip is treated as danger, not “strong swimming”.
+- A separate timer raises a preventive advisory after ~6s in a rip, even with no
+  distress cues yet.
+
+RipVIS is a head start on ocean geometry — still fine-tune later on your own
+tower camera once you have labeled beach footage.
+
 ## Next upgrades
 
 - YOLO person detection on an NVIDIA Jetson in each tower
 - Thermal camera for glare / dusk
 - Multi-tower map on a central board
-- Rip-current zone overlays
-- Supervised model trained on your beach’s labeled clips
+- Supervised distress model trained on your beach’s labeled clips
+- Fine-tune the RipVIS rip model on local tower footage

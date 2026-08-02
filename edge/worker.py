@@ -19,7 +19,8 @@ sys.path.insert(0, str(ROOT))
 from backend.app.config import load_config
 from backend.app.pipeline.camera import build_frame_source
 from backend.app.pipeline.detector import build_detector
-from backend.app.pipeline.distress import score_distress
+from backend.app.pipeline.distress import RipExposureMonitor, score_distress
+from backend.app.pipeline.rip import build_rip_segmenter, draw_rip_overlay
 from backend.app.pipeline.tracker import IoUTracker
 
 
@@ -60,6 +61,42 @@ def encode_jpeg(frame: np.ndarray, quality: int = 75) -> bytes:
     return buf.tobytes()
 
 
+def post_alert(
+    client: httpx.Client,
+    cfg,  # noqa: ANN001
+    track,  # noqa: ANN001
+    score: float,
+    reasons: list[str],
+    jpeg: bytes,
+    kind: str,
+    rip_risk: float,
+    note: str,
+) -> None:
+    payload = {
+        "tower_id": cfg.tower.id,
+        "tower_name": cfg.tower.name,
+        "zone": cfg.tower.zone,
+        "track_id": track.track_id,
+        "score": score,
+        "reasons": reasons,
+        "bbox": {"x": track.x, "y": track.y, "w": track.w, "h": track.h},
+        "frame_jpeg_b64": base64.b64encode(jpeg).decode("ascii"),
+        "note": note,
+        "kind": kind,
+        "rip_risk": rip_risk,
+    }
+    try:
+        response = client.post(cfg.server.alert_url, json=payload)
+        response.raise_for_status()
+        label = "RIP ADVISORY" if kind == "rip_advisory" else "ALERT"
+        print(
+            f"[towerwatch] {label} track #{track.track_id} "
+            f"score={score:.2f} rip={rip_risk:.2f} reasons={reasons}"
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"[towerwatch] failed to post alert: {exc}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="TowerWatch edge worker")
     parser.add_argument("--config", default=str(ROOT / "config" / "default.yaml"))
@@ -71,6 +108,20 @@ def main() -> None:
         cfg.camera.source = args.source
 
     detector = build_detector(cfg.camera.source)
+    rip_segmenter = build_rip_segmenter(
+        enabled=cfg.rip.enabled,
+        weights=cfg.rip_weights_path(),
+        confidence=cfg.rip.confidence,
+        interval_frames=cfg.rip.interval_frames,
+        grid=cfg.rip.grid,
+        smoothing=cfg.rip.smoothing,
+        device=cfg.rip.device,
+    )
+    rip_monitor = RipExposureMonitor(
+        advisory_seconds=cfg.rip.advisory_seconds,
+        cooldown_seconds=cfg.rip.advisory_cooldown_seconds,
+        risk_threshold=cfg.rip.risk_threshold,
+    )
     source = build_frame_source(
         source=cfg.camera.source,
         width=cfg.camera.width,
@@ -100,14 +151,37 @@ def main() -> None:
             detections = detector.detect(frame)
             tracks = tracker.update(detections, history_seconds=cfg.pipeline.history_seconds)
 
+            zones = rip_segmenter.process(frame) if rip_segmenter else None
+
             scores: dict[int, float] = {}
             for track in tracks:
-                result = score_distress(track, fps=cfg.camera.fps)
+                rip_risk = zones.risk_at(track.cx, track.cy) if zones else 0.0
+                result = score_distress(track, fps=cfg.camera.fps, rip_risk=rip_risk)
                 scores[track.track_id] = result.score
                 age_s = track.age_frames / max(cfg.camera.fps, 1e-3)
                 if age_s < cfg.pipeline.min_track_age_seconds:
                     high_since.pop(track.track_id, None)
                     continue
+
+                held_in_rip = rip_monitor.update(track.track_id, rip_risk, loop_start)
+                if held_in_rip is not None and result.score < cfg.pipeline.score_threshold:
+                    advisory = draw_overlay(frame, [track], scores)
+                    if zones and cfg.rip.draw_overlay:
+                        advisory = draw_rip_overlay(advisory, zones, cfg.rip.risk_threshold)
+                    post_alert(
+                        client,
+                        cfg,
+                        track=track,
+                        score=result.score,
+                        reasons=[
+                            f"in rip current for {held_in_rip:.0f}s",
+                            "no distress cues yet — preventive advisory",
+                        ],
+                        jpeg=encode_jpeg(advisory, quality=80),
+                        kind="rip_advisory",
+                        rip_risk=rip_risk,
+                        note="Swimmer in rip current — consider moving them",
+                    )
 
                 if result.score >= cfg.pipeline.score_threshold:
                     high_since.setdefault(track.track_id, loop_start)
@@ -118,37 +192,30 @@ def main() -> None:
                         and cooled >= cfg.pipeline.alert_cooldown_seconds
                     ):
                         overlay = draw_overlay(frame, [track], scores)
-                        jpeg = encode_jpeg(overlay, quality=80)
-                        payload = {
-                            "tower_id": cfg.tower.id,
-                            "tower_name": cfg.tower.name,
-                            "zone": cfg.tower.zone,
-                            "track_id": track.track_id,
-                            "score": result.score,
-                            "reasons": result.reasons,
-                            "bbox": {
-                                "x": track.x,
-                                "y": track.y,
-                                "w": track.w,
-                                "h": track.h,
-                            },
-                            "frame_jpeg_b64": base64.b64encode(jpeg).decode("ascii"),
-                            "note": "Possible drowning / distress — verify visually",
-                        }
-                        try:
-                            resp = client.post(cfg.server.alert_url, json=payload)
-                            resp.raise_for_status()
-                            last_alert_at[track.track_id] = loop_start
-                            print(
-                                f"[towerwatch] ALERT track #{track.track_id} "
-                                f"score={result.score:.2f} reasons={result.reasons}"
+                        if zones and cfg.rip.draw_overlay:
+                            overlay = draw_rip_overlay(
+                                overlay, zones, cfg.rip.risk_threshold
                             )
-                        except Exception as exc:  # noqa: BLE001
-                            print(f"[towerwatch] failed to post alert: {exc}")
+                        post_alert(
+                            client,
+                            cfg,
+                            track=track,
+                            score=result.score,
+                            reasons=result.reasons,
+                            jpeg=encode_jpeg(overlay, quality=80),
+                            kind="distress",
+                            rip_risk=rip_risk,
+                            note="Possible drowning / distress — verify visually",
+                        )
+                        last_alert_at[track.track_id] = loop_start
                 else:
                     high_since.pop(track.track_id, None)
 
+            rip_monitor.forget({t.track_id for t in tracks})
+
             annotated = draw_overlay(frame, tracks, scores)
+            if zones and cfg.rip.draw_overlay:
+                annotated = draw_rip_overlay(annotated, zones, cfg.rip.risk_threshold)
             jpeg = encode_jpeg(annotated, quality=70)
             try:
                 client.post(
@@ -174,6 +241,10 @@ def main() -> None:
                         "fps": round(fps, 2),
                         "last_frame_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                         "pipeline_mode": cfg.camera.source,
+                        "rip_enabled": zones is not None,
+                        "rip_coverage": round(
+                            zones.coverage(cfg.rip.risk_threshold) if zones else 0.0, 4
+                        ),
                     },
                 )
             except Exception:
